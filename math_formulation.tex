@@ -1,0 +1,403 @@
+% =====================================================================================
+% math_formulation.tex
+% Standalone, publication-ready derivations for MultiMax activation probing
+% and uncertainty-gated cascades.
+%
+% Requires: amsmath, amssymb, amsthm, mathtools.
+% Every environment is self-contained; paste sections directly into a paper body.
+% Cross-references use \label{...} keys prefixed eq:/thm:/lem:/prop:/asm:.
+% =====================================================================================
+
+\section{Token-Level Feature Extraction and Probing Pipelines}
+\label{sec:pipeline}
+
+Let $M$ denote a frozen autoregressive transformer and let $x_{i,j}\in\mathbb{R}^{d}$ be
+the residual-stream activation at layer $\ell$, sequence position $j\in\{1,\dots,N_i\}$,
+for input $i$. A \emph{probe} is a map $f_\theta:\mathbb{R}^{N_i\times d}\to\mathbb{R}$
+producing a scalar logit, composed of a token-level transform $\phi$ and a permutation
+sequence-reduction $\rho$:
+%
+\begin{equation}
+  f_\theta(X_i)\;=\;\rho\!\big(\phi(x_{i,1}),\,\dots,\,\phi(x_{i,N_i})\big),
+  \qquad
+  \phi:\mathbb{R}^{d}\to\mathbb{R}^{m}.
+  \label{eq:probe-general}
+\end{equation}
+%
+All probes considered here share $\phi$ and differ only in $\rho$. This is the point of
+the construction: it isolates the \emph{aggregation rule} as the independent variable.
+
+\paragraph{Token transform.}
+\begin{equation}
+  y_{i,j} \;=\; \phi(x_{i,j}) \;=\; \sigma\!\big(W_1 x_{i,j} + b_1\big),
+  \qquad W_1\in\mathbb{R}^{m\times d},
+  \label{eq:mlp}
+\end{equation}
+with $\sigma$ a pointwise nonlinearity (GELU below).
+
+\paragraph{Aggregators.} Write $\alpha_{i,j}\ge 0$, $\sum_{j}\alpha_{i,j}=1$ for a
+convex pooling weight. The four rules compared are
+%
+\begin{align}
+  \text{last token:}\quad
+    &\alpha_{i,j}=\mathbb{1}[\,j=N_i\,], \label{eq:agg-last}\\[2pt]
+  \text{mean:}\quad
+    &\alpha_{i,j}=1/N_i, \label{eq:agg-mean}\\[2pt]
+  \text{softmax attention:}\quad
+    &\alpha_{i,j}=\frac{\exp(q^\top y_{i,j}/\sqrt{m})}
+                       {\sum_{j'=1}^{N_i}\exp(q^\top y_{i,j'}/\sqrt{m})},
+    \label{eq:agg-softmax}\\[2pt]
+  \text{exponential moving average:}\quad
+    &\alpha_{i,j}=\frac{\lambda^{\,N_i-j}}{\sum_{j'=1}^{N_i}\lambda^{\,N_i-j'}},
+     \quad \lambda\in(0,1). \label{eq:agg-ema}
+\end{align}
+%
+For \eqref{eq:agg-last}--\eqref{eq:agg-ema} the logit is $w^\top\!\big(\sum_j
+\alpha_{i,j}y_{i,j}\big)+b$. \textbf{MultiMax} instead applies a hard maximum
+per head, which is \emph{not} of this convex-combination form:
+%
+\begin{equation}
+  \boxed{\;
+  a_h(X_i) \;=\; \max_{1\le j\le N_i}\; v_h^\top y_{i,j},
+  \qquad
+  \mathrm{logit}_i \;=\; \sum_{h=1}^{H} a_h(X_i) \;+\; b,
+  \;}
+  \label{eq:multimax}
+\end{equation}
+with heads $v_h\in\mathbb{R}^{m}$, $h=1,\dots,H$. Predictions are obtained through a
+bounded link,
+%
+\begin{equation}
+  \hat p_i \;=\; \varsigma\!\big(\Pi_{[-c,\,c]}(\mathrm{logit}_i)\big),
+  \qquad \varsigma(z)=\big(1+e^{-z}\big)^{-1},\quad c=10,
+  \label{eq:clamped-sigmoid}
+\end{equation}
+where $\Pi_{[-c,c]}$ is the projection onto $[-c,c]$.
+
+\begin{remark}[Gradient of the clamp]
+\label{rem:clamp}
+$\Pi_{[-c,c]}$ has $\partial\Pi/\partial z=\mathbb{1}[\,|z|<c\,]$, which is
+\emph{identically zero} on the saturated region. Implemented naively, the guard
+introduced to avoid vanishing gradients produces them. We therefore use the
+straight-through estimator
+%
+\begin{equation}
+  \widetilde\Pi(z)\;=\;z+\operatorname{sg}\!\big(\Pi_{[-c,c]}(z)-z\big),
+  \qquad
+  \frac{\partial\widetilde\Pi}{\partial z}\equiv 1,
+  \label{eq:straight-through}
+\end{equation}
+with $\operatorname{sg}$ the stop-gradient. The forward value is exactly the clamp in
+\eqref{eq:clamped-sigmoid}; the backward pass is the identity.
+\end{remark}
+
+
+\section{Context Dilution}
+\label{sec:dilution}
+
+We formalise why averaging aggregators lose a localised signal as context grows, and why
+\eqref{eq:multimax} does not.
+
+\begin{assumption}[Localised attack in benign context]
+\label{asm:needle}
+A sequence of length $N$ contains an attack segment $\mathcal{A}\subset\{1,\dots,N\}$
+with $|\mathcal{A}|=k$ fixed and independent of $N$. There exist constants
+$\mu_{\mathrm{a}}>\mu_{\mathrm{b}}$ such that the head-projected features satisfy
+\begin{equation}
+  v_h^\top y_{j} \;=\;
+  \begin{cases}
+    \mu_{\mathrm{a}} + \varepsilon_j, & j\in\mathcal{A},\\
+    \mu_{\mathrm{b}} + \varepsilon_j, & j\notin\mathcal{A},
+  \end{cases}
+  \label{eq:needle-model}
+\end{equation}
+with $\varepsilon_j$ i.i.d., zero-mean, sub-Gaussian with variance proxy $\tau^2$.
+Write $\Delta:=\mu_{\mathrm{a}}-\mu_{\mathrm{b}}>0$ for the signal gap.
+\end{assumption}
+
+\subsection{Mean aggregation}
+
+\begin{proposition}[Mean pooling dilutes as $\Theta(1/N)$]
+\label{prop:mean}
+Under Assumption~\ref{asm:needle}, the mean-pooled head score satisfies
+\begin{equation}
+  \mathbb{E}\Big[\tfrac{1}{N}\textstyle\sum_{j=1}^{N} v_h^\top y_j\Big]
+    \;-\;\mu_{\mathrm{b}}
+  \;=\; \frac{k}{N}\,\Delta \;=\; \Theta\!\big(N^{-1}\big),
+  \label{eq:mean-dilution}
+\end{equation}
+while the pooled fluctuation has standard deviation $\tau/\sqrt{N}$. The resulting
+signal-to-noise ratio is
+\begin{equation}
+  \mathrm{SNR}_{\mathrm{mean}}(N)
+  \;=\;\frac{(k/N)\Delta}{\tau/\sqrt{N}}
+  \;=\;\frac{k\Delta}{\tau}\,N^{-1/2}
+  \;\xrightarrow[N\to\infty]{}\;0 .
+  \label{eq:mean-snr}
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+Linearity of expectation gives the mean shift $\big(k\mu_{\mathrm{a}}+(N-k)\mu_{\mathrm{b}}\big)/N-\mu_{\mathrm{b}}=k\Delta/N$. Independence gives variance $\tau^2/N$. Dividing yields \eqref{eq:mean-snr}.
+\end{proof}
+
+\begin{corollary}[Detection collapse]
+\label{cor:mean-collapse}
+For any fixed decision threshold calibrated at length $N_0$, the mean-pooled detector's
+power at length $N\gg N_0$ decays as $N^{-1/2}$; equivalently, holding a target
+true-positive rate fixed requires $\Delta$ to grow like $\sqrt{N}$.
+\end{corollary}
+
+\subsection{Softmax aggregation}
+
+\begin{proposition}[Softmax attention weight on the attack is $\mathcal{O}(1/N)$ for
+bounded logit gaps]
+\label{prop:softmax}
+Let the attention logits be $s_j=q^\top y_j/\sqrt{m}$ with
+$s_j\le \bar{s}$ for $j\in\mathcal{A}$ and $s_j\ge \underline{s}$ for
+$j\notin\mathcal{A}$, and set $\gamma:=\bar{s}-\underline{s}<\infty$. Then the total
+attention mass on the attack segment obeys
+\begin{equation}
+  \alpha_{\mathcal{A}}
+  \;:=\;\sum_{j\in\mathcal{A}}\alpha_j
+  \;\le\; \frac{k\,e^{\gamma}}{k\,e^{\gamma}+(N-k)}
+  \;=\;\mathcal{O}\!\big(N^{-1}\big),
+  \qquad N\to\infty .
+  \label{eq:softmax-mass}
+\end{equation}
+\end{proposition}
+
+\begin{proof}
+Write $Z=\sum_{j}e^{s_j}$. Bounding the numerator above and the benign part of the
+denominator below,
+\[
+  \alpha_{\mathcal{A}}
+  =\frac{\sum_{j\in\mathcal{A}}e^{s_j}}{Z}
+  \le\frac{k\,e^{\bar{s}}}{k\,e^{\bar{s}}+(N-k)e^{\underline{s}}}
+  =\frac{k\,e^{\gamma}}{k\,e^{\gamma}+(N-k)} ,
+\]
+after dividing through by $e^{\underline{s}}$. The right-hand side is
+$k e^{\gamma}/N+\mathcal{O}(N^{-2})$.
+\end{proof}
+
+\begin{remark}[Why the gap is bounded in practice]
+\label{rem:gamma}
+Proposition~\ref{prop:softmax} is vacuous if $\gamma$ may grow with $N$. It does not:
+$\gamma$ is set by the trained query $q$ and the feature geometry, both fixed at
+deployment, while $N$ is chosen by the adversary. Escaping dilution would require
+$\gamma\gtrsim\log N$, i.e.\ attention logits growing without bound --- which the
+$1/\sqrt{m}$ scaling in \eqref{eq:agg-softmax} is specifically designed to prevent.
+This is the formal content of the empirical observation that softmax pooling
+\emph{flattens} as context grows.
+\end{remark}
+
+\subsection{MultiMax aggregation}
+
+\begin{theorem}[Padding invariance of the hard maximum]
+\label{thm:multimax}
+Let $X\in\mathbb{R}^{N\times d}$ contain an attack segment $\mathcal{A}$ and let
+$X'=\mathrm{pad}(X,P)$ append $P$ arbitrary benign tokens. Then for every head $h$,
+\begin{equation}
+  a_h(X')\;=\;\max\Big\{\,a_h(X),\;\max_{j\in\text{pad}} v_h^\top y_j\,\Big\}
+  \;\ge\;a_h(X).
+  \label{eq:multimax-monotone}
+\end{equation}
+In particular, if the padded tokens satisfy
+$v_h^\top y_j\le a_h(X)$ --- which holds whenever the padding is benign in the sense of
+Assumption~\ref{asm:needle} and $\Delta>0$ dominates the benign extremes --- then
+\begin{equation}
+  \boxed{\;a_h(X')\;=\;a_h(X)\;=\;\Omega(1),\quad\text{independent of }P.\;}
+  \label{eq:multimax-invariance}
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+The maximum over a union of index sets is the maximum of the sub-maxima, giving
+\eqref{eq:multimax-monotone}; monotonicity is immediate since
+$\mathcal{A}\subseteq\{1,\dots,N\}\subseteq\{1,\dots,N+P\}$. Under the stated condition
+the second term does not exceed the first, so the maximum is attained inside the
+original segment and its value is unchanged.
+\end{proof}
+
+\begin{corollary}[Asymptotic separation of the aggregators]
+\label{cor:separation}
+Under Assumption~\ref{asm:needle}, as $N\to\infty$ with $k$ fixed,
+\begin{equation}
+  \frac{\mathrm{signal}_{\mathrm{multimax}}(N)}{\mathrm{signal}_{\mathrm{mean}}(N)}
+  \;=\;\Theta(N),
+  \qquad
+  \frac{\mathrm{signal}_{\mathrm{multimax}}(N)}{\mathrm{signal}_{\mathrm{softmax}}(N)}
+  \;=\;\Omega(N).
+  \label{eq:separation}
+\end{equation}
+\end{corollary}
+
+\begin{remark}[The cost of the maximum: benign extremes]
+\label{rem:fpr}
+Theorem~\ref{thm:multimax} is one-sided. The same monotonicity that protects recall
+also means the benign maximum grows with $N$: for sub-Gaussian $\varepsilon_j$,
+$\mathbb{E}\big[\max_{j\le N}\varepsilon_j\big]=\Theta\big(\tau\sqrt{2\log N}\big)$.
+A MultiMax probe therefore has a false-positive rate that drifts upward with context
+length unless its threshold is recalibrated as
+\begin{equation}
+  t(N)\;=\;t_0+\tau\sqrt{2\log N},
+  \label{eq:threshold-drift}
+\end{equation}
+which is a $\sqrt{\log N}$ correction rather than the $\sqrt{N}$ correction
+Corollary~\ref{cor:mean-collapse} demands of mean pooling. This is the honest statement
+of the trade: MultiMax converts a polynomial degradation into a logarithmic one; it does
+not eliminate length dependence.
+\end{remark}
+
+\subsection{Complexity}
+
+\begin{proposition}[Memory and time]
+\label{prop:complexity}
+For batch size $1$, sequence length $N$, width $m$, heads $H$, and chunk size $C$:
+\begin{equation}
+  \begin{aligned}
+    \text{MultiMax (chunked):}\quad &\Theta(Nmd)\ \text{time},\quad
+      \Theta(Cm+H)\ \text{activation memory},\\
+    \text{softmax attention (single query):}\quad &\Theta(Nmd)\ \text{time},\quad
+      \Theta(Nm)\ \text{activation memory},\\
+    \text{self-attention:}\quad &\Theta(N^2m)\ \text{time},\quad
+      \Theta(N^2)\ \text{activation memory}.
+  \end{aligned}
+  \label{eq:complexity}
+\end{equation}
+\end{proposition}
+
+\begin{remark}
+Single-query attention pooling is $\Theta(N)$ in memory, not $\Theta(N^2)$: its score
+tensor has shape $(1,N)$. The quadratic term appears only when the probe performs
+self-attention \emph{across} the sequence. MultiMax's advantage over single-query
+pooling is therefore statistical (Theorem~\ref{thm:multimax}), while its advantage in
+memory is the constant-in-$N$ streaming reduction, not an asymptotic separation.
+\end{remark}
+
+
+\section{Cost--Accuracy Optimisation for Uncertainty-Gated Cascades}
+\label{sec:cascade}
+
+\subsection{Routing rule and system cost}
+
+Let $p_i=\varsigma(A\,z_i+B)$ be the calibrated probe probability, where $z_i$ is the raw
+logit and $(A,B)$ are Platt parameters (\S\ref{sec:calibration}). Fix $\delta>0$ and
+define the ambiguous band
+\begin{equation}
+  \mathcal{U}_\delta \;=\;\big\{\,i:\ |p_i-\tfrac12|<\delta\,\big\},
+  \qquad
+  u(\delta)\;=\;\Pr\big[\,|p-\tfrac12|<\delta\,\big].
+  \label{eq:band}
+\end{equation}
+The cascade returns the probe's decision outside $\mathcal{U}_\delta$ and defers to the
+LLM inside it. With $c_{\mathrm{p}}$ the per-request probe cost and
+$c_{\mathrm{L}}$ the per-request LLM cost,
+\begin{equation}
+  \boxed{\;
+  C_{\mathrm{total}}(\delta)\;=\;c_{\mathrm{p}}\;+\;u(\delta)\,c_{\mathrm{L}}\;}
+  \label{eq:cost}
+\end{equation}
+per request, against the LLM-only baseline $C_{\mathrm{base}}=c_{\mathrm{L}}$. The
+relative saving is
+\begin{equation}
+  S(\delta)\;=\;1-\frac{C_{\mathrm{total}}(\delta)}{C_{\mathrm{base}}}
+  \;=\;\big(1-u(\delta)\big)-\frac{c_{\mathrm{p}}}{c_{\mathrm{L}}} .
+  \label{eq:saving}
+\end{equation}
+Since $c_{\mathrm{p}}/c_{\mathrm{L}}\ll 1$ in the regime of interest, the saving is
+governed almost entirely by the escalation rate $u(\delta)$.
+
+\subsection{Accuracy of the cascade}
+
+Let $\mathrm{Acc}_{\mathrm{p}}(\mathcal{S})$ and $\mathrm{Acc}_{\mathrm{L}}(\mathcal{S})$
+denote probe and LLM accuracy on a region $\mathcal{S}$. Then
+\begin{equation}
+  \mathrm{Acc}(\delta)
+  \;=\;\big(1-u(\delta)\big)\,\mathrm{Acc}_{\mathrm{p}}\!\big(\mathcal{U}_\delta^{c}\big)
+      \;+\;u(\delta)\,\mathrm{Acc}_{\mathrm{L}}\!\big(\mathcal{U}_\delta\big).
+  \label{eq:acc}
+\end{equation}
+Differentiating \eqref{eq:acc} and \eqref{eq:cost} with respect to $\delta$ and
+eliminating $\mathrm{d}\delta$ gives the exchange rate between accuracy and money:
+\begin{equation}
+  \frac{\mathrm{d}\,\mathrm{Acc}}{\mathrm{d}\,C_{\mathrm{total}}}
+  \;=\;\frac{1}{c_{\mathrm{L}}}\Big[
+      \mathrm{Acc}_{\mathrm{L}}\!\big(\partial\mathcal{U}_\delta\big)
+      -\mathrm{Acc}_{\mathrm{p}}\!\big(\partial\mathcal{U}_\delta\big)\Big],
+  \label{eq:exchange}
+\end{equation}
+evaluated on the boundary shell $\partial\mathcal{U}_\delta=\{i:|p_i-\frac12|=\delta\}$.
+
+\begin{proposition}[Optimal band width]
+\label{prop:optimal-delta}
+For a budget $\Lambda$ (dollars per unit accuracy), the Lagrangian
+$\mathcal{L}(\delta)=\mathrm{Acc}(\delta)-\Lambda\,C_{\mathrm{total}}(\delta)$ is
+stationary where
+\begin{equation}
+  \mathrm{Acc}_{\mathrm{L}}\!\big(\partial\mathcal{U}_\delta\big)
+  -\mathrm{Acc}_{\mathrm{p}}\!\big(\partial\mathcal{U}_\delta\big)
+  \;=\;\Lambda\,c_{\mathrm{L}} .
+  \label{eq:stationarity}
+\end{equation}
+Escalation is worthwhile exactly while the LLM's marginal advantage on the shell exceeds
+its marginal price. Because $\mathrm{Acc}_{\mathrm{p}}\to\frac12$ as $\delta\to0$ (the
+probe is maximally uncertain at the boundary) and the advantage shrinks monotonically as
+$\delta$ grows, \eqref{eq:stationarity} has a unique root under a unimodal score density,
+and the Pareto frontier exhibits a knee at that $\delta^\ast$.
+\end{proposition}
+
+\subsection{Calibration is a precondition, not a refinement}
+\label{sec:calibration}
+
+The routing rule \eqref{eq:band} is a statement about $p$, so it is meaningful only if
+$p$ is calibrated. Two failure modes bracket the design.
+
+\begin{remark}[Degenerate gating]
+\label{rem:degenerate}
+If the score distribution is over-dispersed, $u(\delta)\to0$ and the cascade silently
+becomes probe-only at full cost saving and probe accuracy. If it is under-dispersed,
+$u(\delta)\to1$ and the cascade becomes LLM-only, paying the baseline while appearing to
+be gated. Both are invisible in $C_{\mathrm{total}}$ alone; both are detected by
+reporting $u(\delta)$.
+\end{remark}
+
+\begin{remark}[Why temperature scaling is insufficient for MultiMax]
+\label{rem:platt}
+The MultiMax logit \eqref{eq:multimax} is a sum of $H$ \emph{maxima}. By
+Remark~\ref{rem:fpr}, $\mathbb{E}[a_h]=\Theta(\sqrt{2\log N})$ even under the null, so
+the logit carries an $N$-dependent positive offset. Temperature scaling
+$p=\varsigma(z/T)$ is a pure rescaling and fixes $\varsigma^{-1}(p)=0$ at $z=0$; it
+cannot move a mis-centred decision boundary. The two-parameter Platt map
+\begin{equation}
+  p \;=\; \varsigma\!\big(A\,z+B\big),
+  \qquad
+  (A,B)\;=\;\argmin_{a,b}\;-\!\!\sum_i\Big[y_i\log\varsigma(az_i+b)+(1-y_i)\log\big(1-\varsigma(az_i+b)\big)\Big],
+  \label{eq:platt}
+\end{equation}
+absorbs both the scale and the offset, and is the minimal correction that makes
+$|p-\frac12|$ an interpretable quantity for \eqref{eq:band}.
+\end{remark}
+
+\subsection{Aggregate cost model}
+
+For $R$ requests with mean prompt length $\bar{n}$ tokens, unit prices $\pi_{\mathrm{in}}$
+and $\pi_{\mathrm{out}}$ per token and $n_{\mathrm{out}}$ output tokens per verdict,
+\begin{equation}
+  C_{\mathrm{total}}(\delta;R)
+  \;=\;R\Big[\underbrace{\kappa\,\bar{n}}_{\text{probe}}
+    \;+\;u(\delta)\big(\pi_{\mathrm{in}}\bar{n}+\pi_{\mathrm{out}}n_{\mathrm{out}}\big)\Big],
+  \label{eq:aggregate-cost}
+\end{equation}
+with $\kappa$ the amortised accelerator cost per token. Tokens routed to the LLM are
+$T(\delta)=R\,u(\delta)\,\bar{n}$, so token savings relative to the baseline are
+\begin{equation}
+  1-\frac{T(\delta)}{R\,\bar{n}}\;=\;1-u(\delta),
+  \label{eq:token-saving}
+\end{equation}
+i.e.\ the escalation rate is simultaneously the token-saving deficit and, up to the
+negligible $c_{\mathrm{p}}/c_{\mathrm{L}}$ term in \eqref{eq:saving}, the monetary one.
+
+% =====================================================================================
+% End of math_formulation.tex
+% =====================================================================================

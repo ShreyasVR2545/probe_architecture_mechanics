@@ -80,7 +80,9 @@ def suite_a(ladder: tuple[int, ...], n_warmup: int = 2, n_iter: int = 5) -> list
     print("SUITE A — context-length latency & peak memory  (batch=1, d=%d)" % D_MODEL)
     print("=" * 86)
     print(f"  {'probe':<14s}{'N':>9s}{'latency ms':>13s}{'ms/1k tok':>12s}"
-          f"{'peak MiB':>11s}{'status':>12s}")
+          f"{'peak MiB':>11s}{'overhead':>12s}{'status':>10s}")
+    print(f"  {'':<14s}{'':>9s}{'':>13s}{'':>12s}{'':>11s}"
+          f"{'(above input)':>12s}")
     rows: list[dict] = []
     for kind in PROBE_KINDS:
         cfg = ProbeConfig(d_model=D_MODEL, hidden=512, n_heads=8, chunk_size=4096)
@@ -103,17 +105,20 @@ def suite_a(ladder: tuple[int, ...], n_warmup: int = 2, n_iter: int = 5) -> list
                 ts.sort()
                 ms = ts[len(ts) // 2]                       # median
                 peak = torch.cuda.max_memory_allocated() / 1024 ** 2 if torch.cuda.is_available() else 0.0
+                input_mib = N * D_MODEL * 2 / 1024 ** 2      # bf16 input, unavoidable O(N)
+                overhead = max(peak - input_mib, 0.0)
                 rec |= {"latency_ms": round(ms, 4), "ms_per_1k_tokens": round(ms / (N / 1000), 5),
-                        "peak_mib": round(peak, 1), "status": "ok"}
+                        "peak_mib": round(peak, 1), "input_mib": round(input_mib, 1),
+                        "overhead_mib": round(overhead, 1), "status": "ok"}
                 print(f"  {kind:<14s}{N:>9d}{ms:>13.3f}{ms/(N/1000):>12.4f}"
-                      f"{peak:>11.1f}{'ok':>12s}")
+                      f"{peak:>11.1f}{overhead:>12.1f}{'ok':>10s}")
                 del x
             except Exception as e:
                 if not is_oom(e):
                     raise
                 rec |= {"latency_ms": None, "ms_per_1k_tokens": None, "peak_mib": None,
                         "status": "OOM"}
-                print(f"  {kind:<14s}{N:>9d}{'-':>13s}{'-':>12s}{'-':>11s}{'OOM':>12s}")
+                print(f"  {kind:<14s}{N:>9d}{'-':>13s}{'-':>12s}{'-':>11s}{'-':>12s}{'OOM':>10s}")
                 clear()
             rows.append(rec)
         del probe
@@ -122,8 +127,8 @@ def suite_a(ladder: tuple[int, ...], n_warmup: int = 2, n_iter: int = 5) -> list
     # scaling exponent: fit log(peak_mem) ~ alpha * log(N)
     print(f"\n  {'probe':<14s}{'mem scaling alpha':>20s}{'interpretation':>28s}")
     for kind in PROBE_KINDS:
-        pts = [(r["N"], r["peak_mib"]) for r in rows
-               if r["probe"] == kind and r.get("peak_mib")]
+        pts = [(r["N"], r["overhead_mib"]) for r in rows
+               if r["probe"] == kind and r.get("overhead_mib") and r["N"] >= 8192]
         if len(pts) >= 2:
             import math
             xs = [math.log(n) for n, _ in pts]
@@ -134,7 +139,7 @@ def suite_a(ladder: tuple[int, ...], n_warmup: int = 2, n_iter: int = 5) -> list
             alpha = num / den
             interp = ("~O(1) in N" if alpha < 0.35 else
                       "~O(N)" if alpha < 1.4 else "~O(N^2)")
-            print(f"  {kind:<14s}{alpha:>20.3f}{interp:>28s}")
+            print(f"  {kind:<14s}{alpha:>10.3f}{interp:>28s}")
             for r in rows:
                 if r["probe"] == kind:
                     r["mem_scaling_alpha"] = round(alpha, 4)
@@ -145,9 +150,17 @@ def suite_a(ladder: tuple[int, ...], n_warmup: int = 2, n_iter: int = 5) -> list
 # Suite B — localized attack insertion
 # ======================================================================================
 def make_attack_direction(d: int, seed: int = 1234) -> torch.Tensor:
+    """Unit direction scaled to sqrt(d), i.e. unit magnitude PER COORDINATE.
+
+    A unit-NORM direction spreads its mass over d=2048 dimensions (~0.022 per
+    coordinate) and is invisible against background sigma=0.5. Measured in a first run:
+    MultiMax AUROC 0.484 at its own training length -- the max reduction was tracking
+    benign extremes, exactly the failure mode of Remark 2.9 in math_formulation.tex.
+    Scaling by sqrt(d) puts the attack on the same per-coordinate scale as the noise.
+    """
     g = torch.Generator().manual_seed(seed)
     v = torch.randn(d, generator=g)
-    return v / v.norm()
+    return (v / v.norm()) * (d ** 0.5)
 
 
 def synth(n: int, N: int, k: int, atk: torch.Tensor, positive: bool,
@@ -199,7 +212,9 @@ def suite_b(quick: bool) -> list[dict]:
     print("\n" + "=" * 86)
     print("SUITE B — localized attack insertion (context dilution)")
     print("=" * 86)
-    N_train, k_train, strength = 512, 8, 3.0
+    # strength is per-coordinate now that atk is sqrt(d)-scaled; 0.5 matches the
+    # background sigma, so the needle is learnable at train length but not trivial.
+    N_train, k_train, strength = 512, 8, 0.5
     N_test = 16384 if not quick else 8192
     ks = (4, 8, 16)
     n_eval = 60 if not quick else 30

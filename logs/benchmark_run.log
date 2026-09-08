@@ -1,0 +1,51 @@
+env: {'python': '3.14.3', 'torch': '2.11.0+cu128', 'device': 'NVIDIA GeForce RTX 5070 Laptop GPU', 'vram_total_gib': 7.96, 'd_model': 2048, 'quick': False}
+
+======================================================================================
+SUITE A — context-length latency & peak memory  (batch=1, d=2048)
+======================================================================================
+  probe                 N   latency ms   ms/1k tok   peak MiB    overhead    status
+                                                             (above input)
+  multimax            128        0.261      2.0406       11.9        11.4        ok
+  multimax           1024        0.241      0.2357       17.1        13.1        ok
+  multimax           8192        0.686      0.0838       51.1        19.1        ok
+  multimax          32768        2.325      0.0710      147.1        19.1        ok
+  multimax         131072        9.153      0.0698      531.1        19.1        ok
+  softmax_attn        128        0.279      2.1820       12.3        11.8        ok
+  softmax_attn       1024        0.234      0.2281       22.1        18.1        ok
+  softmax_attn       8192        0.766      0.0935       95.2        63.2        ok
+  softmax_attn      32768        3.214      0.0981      299.4       171.4        ok
+  softmax_attn     131072       12.623      0.0963     1164.1       652.1        ok
+  mean_pool           128        0.210      1.6430       12.0        11.5        ok
+  mean_pool          1024        0.242      0.2366       21.1        17.1        ok
+  mean_pool          8192        0.706      0.0862       67.1        35.1        ok
+  mean_pool         32768        2.244      0.0685      163.1        35.1        ok
+  mean_pool        131072        9.305      0.0710      547.1        35.1        ok
+  self_attn           128        0.274      2.1406       15.0        14.5        ok
+  self_attn          1024        0.298      0.2911       32.0        28.0        ok
+  self_attn          8192        8.986      1.0969      717.6       685.6        ok
+  self_attn         32768      936.969     28.5940    10509.6     10381.6        ok
+  self_attn        131072            -           -          -           -       OOM
+
+  probe            mem scaling alpha              interpretation
+  multimax           0.000                  ~O(1) in N
+  softmax_attn       0.842                       ~O(N)
+  mean_pool          0.000                  ~O(1) in N
+  self_attn          1.960                     ~O(N^2)
+
+======================================================================================
+SUITE B — localized attack insertion (context dilution)
+======================================================================================
+  train: N=512, k=8, 240 seqs | test: N=16384, 60 pos + 60 neg per k
+  FNR measured at a threshold giving 1% FPR on benign of the SAME length
+
+  trained multimax
+  trained softmax_attn
+  trained mean_pool
+
+  probe            k       N   recall@1%FPR      FNR    AUROC
+  multimax         8     512         1.0000   0.0000   1.0000   <- train length
+  multimax         4   16384         1.0000   0.0000   1.0000
+  multimax         8   16384         1.0000   0.0000   1.0000
+  multimax        16   16384         1.0000   0.0000   1.0000
+  softmax_attn     8     512         1.0000   0.0000   1.0000   <- train length
+  softmax_attn     4   16384         1.0000   0.0000   1.0000
