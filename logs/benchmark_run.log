@@ -49,3 +49,19 @@ SUITE B — localized attack insertion (context dilution)
   multimax        16   16384         1.0000   0.0000   1.0000
   softmax_attn     8     512         1.0000   0.0000   1.0000   <- train length
   softmax_attn     4   16384         1.0000   0.0000   1.0000
+  softmax_attn     8   16384         1.0000   0.0000   1.0000
+  softmax_attn    16   16384         1.0000   0.0000   1.0000
+  mean_pool        8     512         1.0000   0.0000   1.0000   <- train length
+  mean_pool        4   16384         0.6000   0.4000   0.9031
+  mean_pool        8   16384         0.9500   0.0500   0.9986
+  mean_pool       16   16384         1.0000   0.0000   1.0000
+
+======================================================================================
+VERDICTS
+======================================================================================
+  MultiMax recall > 99% at every k under long-context OOD : HOLDS  (min recall 1.0000)
+  softmax_attn   min recall under the same shift          : 1.0000
+  mean_pool      min recall under the same shift          : 0.6000
+  memory scaling exponents (log-log fit)                  : softmax_attn=0.84, self_attn=1.96
+
+  -> wrote benchmark_results.json

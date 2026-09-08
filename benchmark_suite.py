@@ -305,7 +305,9 @@ def main() -> int:
         rs = [r["recall"] for r in b if r["probe"] == kind and r["regime"] == "long-context OOD"]
         if rs:
             print(f"  {kind:<14s} min recall under the same shift          : {min(rs):.4f}")
-    alphas = {r["probe"]: r.get("mem_scaling_alpha") for r in a if r.get("mem_scaling_alpha")}
+    # Keyed on presence, not truthiness: an exponent of exactly 0.000 is the O(1)-in-N
+    # result this suite exists to identify, and `if r.get(...)` silently dropped it.
+    alphas = {r["probe"]: r["mem_scaling_alpha"] for r in a if "mem_scaling_alpha" in r}
     print(f"  memory scaling exponents (log-log fit)                  : "
           + ", ".join(f"{k}={v:.2f}" for k, v in alphas.items()))
 

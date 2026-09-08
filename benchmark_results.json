@@ -1,0 +1,377 @@
+{
+  "env": {
+    "python": "3.14.3",
+    "torch": "2.11.0+cu128",
+    "device": "NVIDIA GeForce RTX 5070 Laptop GPU",
+    "vram_total_gib": 7.96,
+    "d_model": 2048,
+    "quick": false
+  },
+  "suite_a_latency_memory": [
+    {
+      "probe": "multimax",
+      "N": 128,
+      "d_model": 2048,
+      "latency_ms": 0.2612,
+      "ms_per_1k_tokens": 2.04063,
+      "peak_mib": 11.9,
+      "input_mib": 0.5,
+      "overhead_mib": 11.4,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "multimax",
+      "N": 1024,
+      "d_model": 2048,
+      "latency_ms": 0.2414,
+      "ms_per_1k_tokens": 0.23574,
+      "peak_mib": 17.1,
+      "input_mib": 4.0,
+      "overhead_mib": 13.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "multimax",
+      "N": 8192,
+      "d_model": 2048,
+      "latency_ms": 0.6864,
+      "ms_per_1k_tokens": 0.08379,
+      "peak_mib": 51.1,
+      "input_mib": 32.0,
+      "overhead_mib": 19.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "multimax",
+      "N": 32768,
+      "d_model": 2048,
+      "latency_ms": 2.3252,
+      "ms_per_1k_tokens": 0.07096,
+      "peak_mib": 147.1,
+      "input_mib": 128.0,
+      "overhead_mib": 19.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "multimax",
+      "N": 131072,
+      "d_model": 2048,
+      "latency_ms": 9.1528,
+      "ms_per_1k_tokens": 0.06983,
+      "peak_mib": 531.1,
+      "input_mib": 512.0,
+      "overhead_mib": 19.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "softmax_attn",
+      "N": 128,
+      "d_model": 2048,
+      "latency_ms": 0.2793,
+      "ms_per_1k_tokens": 2.18203,
+      "peak_mib": 12.3,
+      "input_mib": 0.5,
+      "overhead_mib": 11.8,
+      "status": "ok",
+      "mem_scaling_alpha": 0.8418
+    },
+    {
+      "probe": "softmax_attn",
+      "N": 1024,
+      "d_model": 2048,
+      "latency_ms": 0.2336,
+      "ms_per_1k_tokens": 0.22812,
+      "peak_mib": 22.1,
+      "input_mib": 4.0,
+      "overhead_mib": 18.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.8418
+    },
+    {
+      "probe": "softmax_attn",
+      "N": 8192,
+      "d_model": 2048,
+      "latency_ms": 0.766,
+      "ms_per_1k_tokens": 0.09351,
+      "peak_mib": 95.2,
+      "input_mib": 32.0,
+      "overhead_mib": 63.2,
+      "status": "ok",
+      "mem_scaling_alpha": 0.8418
+    },
+    {
+      "probe": "softmax_attn",
+      "N": 32768,
+      "d_model": 2048,
+      "latency_ms": 3.2137,
+      "ms_per_1k_tokens": 0.09807,
+      "peak_mib": 299.4,
+      "input_mib": 128.0,
+      "overhead_mib": 171.4,
+      "status": "ok",
+      "mem_scaling_alpha": 0.8418
+    },
+    {
+      "probe": "softmax_attn",
+      "N": 131072,
+      "d_model": 2048,
+      "latency_ms": 12.6233,
+      "ms_per_1k_tokens": 0.09631,
+      "peak_mib": 1164.1,
+      "input_mib": 512.0,
+      "overhead_mib": 652.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.8418
+    },
+    {
+      "probe": "mean_pool",
+      "N": 128,
+      "d_model": 2048,
+      "latency_ms": 0.2103,
+      "ms_per_1k_tokens": 1.64297,
+      "peak_mib": 12.0,
+      "input_mib": 0.5,
+      "overhead_mib": 11.5,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "mean_pool",
+      "N": 1024,
+      "d_model": 2048,
+      "latency_ms": 0.2423,
+      "ms_per_1k_tokens": 0.23662,
+      "peak_mib": 21.1,
+      "input_mib": 4.0,
+      "overhead_mib": 17.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "mean_pool",
+      "N": 8192,
+      "d_model": 2048,
+      "latency_ms": 0.7064,
+      "ms_per_1k_tokens": 0.08623,
+      "peak_mib": 67.1,
+      "input_mib": 32.0,
+      "overhead_mib": 35.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "mean_pool",
+      "N": 32768,
+      "d_model": 2048,
+      "latency_ms": 2.2444,
+      "ms_per_1k_tokens": 0.06849,
+      "peak_mib": 163.1,
+      "input_mib": 128.0,
+      "overhead_mib": 35.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "mean_pool",
+      "N": 131072,
+      "d_model": 2048,
+      "latency_ms": 9.3053,
+      "ms_per_1k_tokens": 0.07099,
+      "peak_mib": 547.1,
+      "input_mib": 512.0,
+      "overhead_mib": 35.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "self_attn",
+      "N": 128,
+      "d_model": 2048,
+      "latency_ms": 0.274,
+      "ms_per_1k_tokens": 2.14062,
+      "peak_mib": 15.0,
+      "input_mib": 0.5,
+      "overhead_mib": 14.5,
+      "status": "ok",
+      "mem_scaling_alpha": 1.9603
+    },
+    {
+      "probe": "self_attn",
+      "N": 1024,
+      "d_model": 2048,
+      "latency_ms": 0.2981,
+      "ms_per_1k_tokens": 0.29111,
+      "peak_mib": 32.0,
+      "input_mib": 4.0,
+      "overhead_mib": 28.0,
+      "status": "ok",
+      "mem_scaling_alpha": 1.9603
+    },
+    {
+      "probe": "self_attn",
+      "N": 8192,
+      "d_model": 2048,
+      "latency_ms": 8.9857,
+      "ms_per_1k_tokens": 1.09689,
+      "peak_mib": 717.6,
+      "input_mib": 32.0,
+      "overhead_mib": 685.6,
+      "status": "ok",
+      "mem_scaling_alpha": 1.9603
+    },
+    {
+      "probe": "self_attn",
+      "N": 32768,
+      "d_model": 2048,
+      "latency_ms": 936.9686,
+      "ms_per_1k_tokens": 28.59401,
+      "peak_mib": 10509.6,
+      "input_mib": 128.0,
+      "overhead_mib": 10381.6,
+      "status": "ok",
+      "mem_scaling_alpha": 1.9603
+    },
+    {
+      "probe": "self_attn",
+      "N": 131072,
+      "d_model": 2048,
+      "latency_ms": null,
+      "ms_per_1k_tokens": null,
+      "peak_mib": null,
+      "status": "OOM",
+      "mem_scaling_alpha": 1.9603
+    }
+  ],
+  "suite_b_attack_insertion": [
+    {
+      "probe": "multimax",
+      "k": 8,
+      "N": 512,
+      "recall": 1.0,
+      "fnr": 0.0,
+      "auroc": 1.0,
+      "regime": "in-distribution"
+    },
+    {
+      "probe": "multimax",
+      "k": 4,
+      "N": 16384,
+      "recall": 1.0,
+      "fnr": 0.0,
+      "auroc": 1.0,
+      "regime": "long-context OOD",
+      "dilution_ratio": 0.000244140625
+    },
+    {
+      "probe": "multimax",
+      "k": 8,
+      "N": 16384,
+      "recall": 1.0,
+      "fnr": 0.0,
+      "auroc": 1.0,
+      "regime": "long-context OOD",
+      "dilution_ratio": 0.00048828125
+    },
+    {
+      "probe": "multimax",
+      "k": 16,
+      "N": 16384,
+      "recall": 1.0,
+      "fnr": 0.0,
+      "auroc": 1.0,
+      "regime": "long-context OOD",
+      "dilution_ratio": 0.0009765625
+    },
+    {
+      "probe": "softmax_attn",
+      "k": 8,
+      "N": 512,
+      "recall": 1.0,
+      "fnr": 0.0,
+      "auroc": 1.0,
+      "regime": "in-distribution"
+    },
+    {
+      "probe": "softmax_attn",
+      "k": 4,
+      "N": 16384,
+      "recall": 1.0,
+      "fnr": 0.0,
+      "auroc": 1.0,
+      "regime": "long-context OOD",
+      "dilution_ratio": 0.000244140625
+    },
+    {
+      "probe": "softmax_attn",
+      "k": 8,
+      "N": 16384,
+      "recall": 1.0,
+      "fnr": 0.0,
+      "auroc": 1.0,
+      "regime": "long-context OOD",
+      "dilution_ratio": 0.00048828125
+    },
+    {
+      "probe": "softmax_attn",
+      "k": 16,
+      "N": 16384,
+      "recall": 1.0,
+      "fnr": 0.0,
+      "auroc": 1.0,
+      "regime": "long-context OOD",
+      "dilution_ratio": 0.0009765625
+    },
+    {
+      "probe": "mean_pool",
+      "k": 8,
+      "N": 512,
+      "recall": 1.0,
+      "fnr": 0.0,
+      "auroc": 1.0,
+      "regime": "in-distribution"
+    },
+    {
+      "probe": "mean_pool",
+      "k": 4,
+      "N": 16384,
+      "recall": 0.6000000238418579,
+      "fnr": 0.3999999761581421,
+      "auroc": 0.9030555486679077,
+      "regime": "long-context OOD",
+      "dilution_ratio": 0.000244140625
+    },
+    {
+      "probe": "mean_pool",
+      "k": 8,
+      "N": 16384,
+      "recall": 0.949999988079071,
+      "fnr": 0.050000011920928955,
+      "auroc": 0.9986110925674438,
+      "regime": "long-context OOD",
+      "dilution_ratio": 0.00048828125
+    },
+    {
+      "probe": "mean_pool",
+      "k": 16,
+      "N": 16384,
+      "recall": 1.0,
+      "fnr": 0.0,
+      "auroc": 1.0,
+      "regime": "long-context OOD",
+      "dilution_ratio": 0.0009765625
+    }
+  ],
+  "verdicts": {
+    "multimax_recall_above_99pct": true,
+    "multimax_min_recall_long_ctx": 1.0,
+    "memory_scaling_alpha": {
+      "softmax_attn": 0.8418,
+      "self_attn": 1.9603
+    }
+  }
+}

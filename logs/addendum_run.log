@@ -1,0 +1,8 @@
+====================================================================================
+CROSSOVER SWEEP — k=4 attack tokens in N=16384, trained at N=512
+====================================================================================
+  dilution ratio k/N = 2.44e-04
+  recall @ 1% FPR on benign of the same length, 40 pos + 40 neg
+
+   strength        multimax    softmax_attn       mean_pool
+       0.05       0.05/0.03       0.03/0.05       0.00/0.00
