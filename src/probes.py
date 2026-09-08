@@ -40,6 +40,22 @@ class BaseProbe(nn.Module):
     name: str = "base"
     needs_full_sequence: bool = True
 
+    @torch.no_grad()
+    def pooling_weights(self, H: torch.Tensor) -> torch.Tensor:
+        """(T,) non-negative weights a_t with sum 1 such that pooled = sum_t a_t H[t].
+
+        This is the object that makes the Phase-3 decomposition exact and, crucially,
+        keeps the SAE *in distribution*: instead of encoding a pooled vector the SAE
+        never saw during training, we encode each per-token residual h_t (which is
+        exactly what it was trained on) and re-weight by a_t afterwards:
+
+            score - b = w . sum_t a_t h_t = sum_t a_t (w . h_t)
+                      ~ sum_i [ sum_t a_t f_i(h_t) ] * (w . W_dec[i])
+
+        so every latent's contribution to the score is attributable.
+        """
+        raise NotImplementedError
+
     def pooled(self, H: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
 
@@ -62,6 +78,12 @@ class LinearLastToken(BaseProbe):
         super().__init__()
         self.lin = nn.Linear(d, 1)
 
+    @torch.no_grad()
+    def pooling_weights(self, H: torch.Tensor) -> torch.Tensor:
+        w = torch.zeros(H.shape[-2], device=H.device, dtype=H.dtype)
+        w[-1] = 1.0
+        return w
+
     def pooled(self, H: torch.Tensor) -> torch.Tensor:
         return H[..., -1, :]
 
@@ -79,6 +101,11 @@ class MeanMLP(BaseProbe):
     def __init__(self, d: int, hidden: int = 128):
         super().__init__()
         self.net = nn.Sequential(nn.Linear(d, hidden), nn.GELU(), nn.Linear(hidden, 1))
+
+    @torch.no_grad()
+    def pooling_weights(self, H: torch.Tensor) -> torch.Tensor:
+        T = H.shape[-2]
+        return torch.full((T,), 1.0 / T, device=H.device, dtype=H.dtype)
 
     def pooled(self, H: torch.Tensor) -> torch.Tensor:
         return H.mean(dim=-2)
@@ -114,6 +141,13 @@ class EMAProbe(BaseProbe):
     @property
     def lam(self) -> torch.Tensor:
         return torch.sigmoid(self.lam_logit)
+
+    @torch.no_grad()
+    def pooling_weights(self, H: torch.Tensor) -> torch.Tensor:
+        T = H.shape[-2]
+        pw = torch.arange(T - 1, -1, -1, device=H.device, dtype=H.dtype)
+        w = self.lam ** pw
+        return w / w.sum().clamp_min(1e-9)
 
     def pooled(self, H: torch.Tensor) -> torch.Tensor:
         """Causal EMA over positions, normalised. Recency-weighted, unlike the mean."""
@@ -156,6 +190,10 @@ class AttnGatedProbe(BaseProbe):
         hard = F.one_hot(s.argmax(dim=-1), num_classes=s.shape[-1]).to(s.dtype)
         soft = F.softmax(s, dim=-1)
         return hard + soft - soft.detach()
+
+    @torch.no_grad()
+    def pooling_weights(self, H: torch.Tensor) -> torch.Tensor:
+        return self.weights(H)
 
     def pooled(self, H: torch.Tensor) -> torch.Tensor:
         return (H * self.weights(H).unsqueeze(-1)).sum(dim=-2)
