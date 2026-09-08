@@ -152,20 +152,23 @@ def main() -> int:
                    ls="--", c="k", label="lexical (black-box)")
         ax[0].axhline(0.5, c="grey", lw=0.8)
         ax[0].set_xlabel("filler tokens"); ax[0].set_ylabel("AUROC")
-        ax[0].set_title("Phase 2: OOD decay"); ax[0].legend(fontsize=7); ax[0].set_xscale("symlog")
+        ax[0].set_title("Phase 2: OOD decay"); ax[0].legend(fontsize=7); ax[0].set_xscale("symlog", linthresh=256); ax[0].set_xlim(left=-30)
 
         lad3 = [int(x) for x in p3["ladder"]]
         for a in ARCHS:
             ax[1].plot(lad3, [p3["snr"][a][str(l)] for l in lad3], marker="s", label=a)
         ax[1].set_xlabel("filler tokens"); ax[1].set_ylabel("safety-latent SNR")
-        ax[1].set_title("Phase 3: SNR (mechanism)"); ax[1].set_xscale("symlog")
+        ax[1].set_title("Phase 3: SNR (mechanism)")
+        ax[1].set_xscale("symlog", linthresh=1024); ax[1].set_xlim(left=-120)
         ax[1].legend(fontsize=7)
 
         x = [p3["snr"][a][str(lad3[-1])] / p3["snr"][a][str(lad3[0])] for a in ARCHS]
         yv = [p2["ladder_results"][a][str(lad[-1])] for a in ARCHS]
         ax[2].scatter(x, yv, s=60)
         for a, xi, yi in zip(ARCHS, x, yv):
-            ax[2].annotate(a, (xi, yi), fontsize=7, xytext=(3, 3), textcoords="offset points")
+            ax[2].annotate(a, (xi, yi), fontsize=7.5,
+                           xytext=(6, 6 if a != "mean_mlp" else -12),
+                           textcoords="offset points")
         r = torch.corrcoef(torch.stack([torch.tensor(x), torch.tensor(yv)]))[0, 1].item()
         ax[2].set_xlabel("SNR retention (L_max / L_0)")
         ax[2].set_ylabel("AUROC @ 7680 filler tokens")
