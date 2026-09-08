@@ -1,0 +1,96 @@
+{
+  "phase": 5,
+  "solo_spread_long": {
+    "solos": {
+      "linear_last": 0.709038257598877,
+      "mean_mlp": 0.5136412382125854,
+      "ema": 0.7794543504714966,
+      "attn_soft": 0.5377228856086731,
+      "attn_hard": 0.7369303703308105
+    },
+    "spread": 0.26581311225891113
+  },
+  "quality_matched": {
+    "het_mean_gain": NaN,
+    "hom_mean_gain": -0.021277248859405518,
+    "tolerance": 0.05,
+    "het_triples": []
+  },
+  "weighted_ensembles": [
+    {
+      "name": "linear_last",
+      "kind": "homogeneous",
+      "equal": 0.7256515622138977,
+      "weighted": 0.7261088490486145,
+      "delta": 0.0004572868347167969
+    },
+    {
+      "name": "mean_mlp",
+      "kind": "homogeneous",
+      "equal": 0.5116598010063171,
+      "weighted": 0.5116598010063171,
+      "delta": 0.0
+    },
+    {
+      "name": "ema",
+      "kind": "homogeneous",
+      "equal": 0.7945435047149658,
+      "weighted": 0.7945435047149658,
+      "delta": 0.0
+    },
+    {
+      "name": "attn_soft",
+      "kind": "homogeneous",
+      "equal": 0.5403139591217041,
+      "weighted": 0.5422953963279724,
+      "delta": 0.0019814372062683105
+    },
+    {
+      "name": "attn_hard",
+      "kind": "homogeneous",
+      "equal": 0.6306965351104736,
+      "weighted": 0.735863447189331,
+      "delta": 0.10516691207885742
+    },
+    {
+      "name": "het_dilution_resistant",
+      "kind": "heterogeneous",
+      "equal": 0.7154397368431091,
+      "weighted": 0.7738149762153625,
+      "delta": 0.05837523937225342
+    },
+    {
+      "name": "het_mixed_pooling",
+      "kind": "heterogeneous",
+      "equal": 0.6689528822898865,
+      "weighted": 0.711629331111908,
+      "delta": 0.042676448822021484
+    },
+    {
+      "name": "het_broad",
+      "kind": "heterogeneous",
+      "equal": 0.6584362387657166,
+      "weighted": 0.793628990650177,
+      "delta": 0.13519275188446045
+    }
+  ],
+  "at_L0": {
+    "het_mean_gain": -0.018625199794769287,
+    "hom_mean_gain": -0.010669124126434327,
+    "solo_spread": 0.06569123268127441
+  },
+  "snr_vs_auroc_correlation": 0.981820821762085,
+  "final_audit": {
+    "P1 hooks verified against hidden_states": true,
+    "P2 length confound neutralised": true,
+    "P2 source confound measured (not hidden)": true,
+    "P2 black-box baseline reported": true,
+    "P3 decomposition faithful (r>0.85)": true,
+    "P3 safety latents beat permutation null": true,
+    "P3 SAE vs random dictionary: REPORTED AS FAILING": true,
+    "P3 H3-A structure is SAE-specific": true,
+    "P4 all overlaps vs empirical null": true,
+    "P4 H3-B underpowered, reported as such": true,
+    "P5 ensemble result disentangled from member quality": true
+  }
+}
