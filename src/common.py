@@ -250,10 +250,16 @@ class ResidualCapture:
         return out
 
 
-@torch.inference_mode()
+@torch.no_grad()
 def forward_capture(model, input_ids: torch.Tensor, layers: Sequence[int],
                     mode: str = "last") -> dict[int, torch.Tensor]:
-    """Single forward pass with residual capture. use_cache=False saves KV memory."""
+    """Single forward pass with residual capture. use_cache=False saves KV memory.
+
+    Deliberately torch.no_grad() and not torch.inference_mode(): inference-mode tensors
+    are permanently barred from autograd, and these activations are the *training data*
+    for the probes in Phase 2. The memory difference is negligible here because the
+    captured tensors leave the device immediately.
+    """
     with ResidualCapture(model, layers, mode=mode) as cap:
         model(input_ids=input_ids, use_cache=False)
         return cap.pop()

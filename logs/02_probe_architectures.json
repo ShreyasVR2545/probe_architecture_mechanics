@@ -1,0 +1,210 @@
+{
+  "phase": 2,
+  "ladder": [
+    0,
+    512,
+    1024,
+    2048,
+    4096,
+    7680
+  ],
+  "layer": 17,
+  "model": {
+    "model_id": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+    "n_layers_config": 24,
+    "n_blocks_found": 24,
+    "d_model": 2048,
+    "n_heads": 32,
+    "n_kv_heads": 32,
+    "head_dim": 64,
+    "dtype": "torch.bfloat16",
+    "n_params_b": 1.711
+  },
+  "length_matching": {
+    "train_before": 0.6975868344306946,
+    "train_after": 0.5182126760482788,
+    "matched_before": 0.6159499883651733,
+    "matched_after": 0.4878067374229431,
+    "n_train": 800,
+    "n_matched": 162
+  },
+  "length_confound": {
+    "train_auroc": 0.49120843410491943,
+    "matched_auroc": 0.48727327585220337
+  },
+  "training": {
+    "linear_last": {
+      "params": 2049,
+      "final_loss": 6.738928123013465e-05,
+      "auroc_train": 1.0,
+      "auroc_heldout": 0.997187077999115,
+      "auroc_matched": 0.7283950448036194,
+      "seconds": 1.1
+    },
+    "mean_mlp": {
+      "params": 262401,
+      "final_loss": 0.004070911946473643,
+      "auroc_train": 1.0,
+      "auroc_heldout": 0.9960931539535522,
+      "auroc_matched": 0.7648224234580994,
+      "seconds": 7.1
+    },
+    "ema": {
+      "params": 2050,
+      "final_loss": 0.00038352353767550084,
+      "auroc_train": 1.0,
+      "auroc_heldout": 0.9998437166213989,
+      "auroc_matched": 0.7940862774848938,
+      "seconds": 7.5
+    },
+    "attn_soft": {
+      "params": 4097,
+      "final_loss": 0.0003069202277401928,
+      "auroc_train": 1.0,
+      "auroc_heldout": 1.0,
+      "auroc_matched": 0.7904282808303833,
+      "seconds": 7.5
+    },
+    "attn_hard": {
+      "params": 4097,
+      "final_loss": 0.0007317115603655111,
+      "auroc_train": 1.0,
+      "auroc_heldout": 0.9990623593330383,
+      "auroc_matched": 0.7779302000999451,
+      "seconds": 9.6
+    }
+  },
+  "lexical_baseline": {
+    "heldout": 0.9898421764373779,
+    "matched": 0.7055326700210571
+  },
+  "ladder_results": {
+    "linear_last": {
+      "0": 0.7283950448036194,
+      "512": 0.7076665163040161,
+      "1024": 0.7062947750091553,
+      "2048": 0.6985215544700623,
+      "4096": 0.7136107087135315,
+      "7680": 0.7104099988937378
+    },
+    "mean_mlp": {
+      "0": 0.7648224234580994,
+      "512": 0.5374180674552917,
+      "1024": 0.46791648864746094,
+      "2048": 0.5322359204292297,
+      "4096": 0.4634964168071747,
+      "7680": 0.4682213068008423
+    },
+    "ema": {
+      "0": 0.7940862774848938,
+      "512": 0.7890565395355225,
+      "1024": 0.7916476130485535,
+      "2048": 0.7919524312019348,
+      "4096": 0.7919524312019348,
+      "7680": 0.7887517213821411
+    },
+    "attn_soft": {
+      "0": 0.7904282808303833,
+      "512": 0.5555555820465088,
+      "1024": 0.4935223162174225,
+      "2048": 0.5246151685714722,
+      "4096": 0.46212467551231384,
+      "7680": 0.47157445549964905
+    },
+    "attn_hard": {
+      "0": 0.7779302000999451,
+      "512": 0.7320530414581299,
+      "1024": 0.6880048513412476,
+      "2048": 0.7788447141647339,
+      "4096": 0.75323885679245,
+      "7680": 0.7140679955482483
+    },
+    "lexical": {
+      "0": 0.7055326700210571,
+      "512": 0.5275110602378845,
+      "1024": 0.5857338905334473,
+      "2048": 0.5735406279563904,
+      "4096": 0.49276024103164673,
+      "7680": 0.521261990070343
+    }
+  },
+  "ladder_meta": {
+    "0": {
+      "median_seq_len": 112,
+      "peak_gib": 3.412,
+      "length_auroc": 0.48727327585220337
+    },
+    "512": {
+      "median_seq_len": 635,
+      "peak_gib": 3.535,
+      "length_auroc": 0.484377384185791
+    },
+    "1024": {
+      "median_seq_len": 1147,
+      "peak_gib": 3.701,
+      "length_auroc": 0.4865112006664276
+    },
+    "2048": {
+      "median_seq_len": 2171,
+      "peak_gib": 3.992,
+      "length_auroc": 0.48750191926956177
+    },
+    "4096": {
+      "median_seq_len": 4219,
+      "peak_gib": 4.553,
+      "length_auroc": 0.48315805196762085
+    },
+    "7680": {
+      "median_seq_len": 7803,
+      "peak_gib": 5.541,
+      "length_auroc": 0.49215057492256165
+    }
+  },
+  "summary": {
+    "linear_last": {
+      "auroc_short": 0.7283950448036194,
+      "auroc_long": 0.7104099988937378,
+      "decay": 0.017985045909881592,
+      "black_to_white_long": 0.18914800882339478
+    },
+    "mean_mlp": {
+      "auroc_short": 0.7648224234580994,
+      "auroc_long": 0.4682213068008423,
+      "decay": 0.2966011166572571,
+      "black_to_white_long": -0.05304068326950073
+    },
+    "ema": {
+      "auroc_short": 0.7940862774848938,
+      "auroc_long": 0.7887517213821411,
+      "decay": 0.0053345561027526855,
+      "black_to_white_long": 0.2674897313117981
+    },
+    "attn_soft": {
+      "auroc_short": 0.7904282808303833,
+      "auroc_long": 0.47157445549964905,
+      "decay": 0.31885382533073425,
+      "black_to_white_long": -0.04968753457069397
+    },
+    "attn_hard": {
+      "auroc_short": 0.7779302000999451,
+      "auroc_long": 0.7140679955482483,
+      "decay": 0.06386220455169678,
+      "black_to_white_long": 0.19280600547790527
+    }
+  },
+  "audit": {
+    "checks": {
+      "length_not_a_label_cue_train": true,
+      "length_not_a_label_cue_matched": true,
+      "length_not_a_cue_on_ladder": true,
+      "source_confound_measured": true,
+      "black_box_baseline_present": true,
+      "at_least_one_probe_beats_lexical_long": true,
+      "architectures_differ_at_long_ctx": true,
+      "vram_within_ceiling": true
+    },
+    "best_long_context": "ema",
+    "largest_decay": "attn_soft",
+    "all_passed": true
+  }
+}
