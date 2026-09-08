@@ -1,0 +1,45 @@
+# ---- environments ----
+.venv/
+venv/
+env/
+.env
+*.env
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# ---- cached tensors / activations (regenerable, large) ----
+*.pt
+*.pth
+*.npy
+*.npz
+*.safetensors
+*.bin
+*.memmap
+data/activations/
+data/cache/
+artifacts/*.pt
+artifacts/*.npy
+
+# ---- model checkpoints ----
+checkpoints/
+*.ckpt
+models/
+
+# ---- HF cache ----
+.cache/
+hf_cache/
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# ---- keep these ----
+!logs/*.json
+!logs/*.md
+!artifacts/*.json
+!artifacts/*.csv
+!figures/*.png
+!figures/*.svg

@@ -1,0 +1,185 @@
+{
+  "phase": 1,
+  "environment": {
+    "python": "3.14.3",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "torch": "2.11.0+cu128",
+    "cuda_available": true,
+    "device_name": "NVIDIA GeForce RTX 5070 Laptop GPU",
+    "bf16_supported": true,
+    "vram_total_gib": 7.96,
+    "vram_free_gib": 6.83
+  },
+  "ceiling": {
+    "brief_gib": 11.5,
+    "operative_gib": 7.0,
+    "reason": "brief ceiling exceeds physical VRAM on this device"
+  },
+  "model": {
+    "model_id": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+    "n_layers_config": 24,
+    "n_blocks_found": 24,
+    "d_model": 2048,
+    "n_heads": 32,
+    "n_kv_heads": 32,
+    "head_dim": 64,
+    "dtype": "torch.bfloat16",
+    "n_params_b": 1.711
+  },
+  "hook_last_token": {
+    "ok": true,
+    "layers": {
+      "11": [
+        1,
+        2048
+      ],
+      "17": [
+        1,
+        2048
+      ],
+      "21": [
+        1,
+        2048
+      ]
+    }
+  },
+  "hook_crossvalidation": {
+    "11": {
+      "max_abs_delta": 0.0,
+      "rel": 0.0,
+      "match": true
+    },
+    "17": {
+      "max_abs_delta": 0.0,
+      "rel": 0.0,
+      "match": true
+    },
+    "21": {
+      "max_abs_delta": 0.0,
+      "rel": 0.0,
+      "match": true
+    }
+  },
+  "context_sweep": [
+    {
+      "tokens": 256,
+      "peak_reserved_gib": 3.43,
+      "seconds": 0.047,
+      "within_ceiling": true
+    },
+    {
+      "tokens": 1024,
+      "peak_reserved_gib": 3.541,
+      "seconds": 0.098,
+      "within_ceiling": true
+    },
+    {
+      "tokens": 2048,
+      "peak_reserved_gib": 3.75,
+      "seconds": 0.198,
+      "within_ceiling": true
+    },
+    {
+      "tokens": 4096,
+      "peak_reserved_gib": 4.104,
+      "seconds": 0.439,
+      "within_ceiling": true
+    },
+    {
+      "tokens": 8192,
+      "peak_reserved_gib": 4.883,
+      "seconds": 1.057,
+      "within_ceiling": true
+    }
+  ],
+  "max_context_within_ceiling": 8192,
+  "all_token_capture": {
+    "T": 1024,
+    "mib_per_sequence": 24.0,
+    "gib_per_5000_seqs": 117.2
+  },
+  "sae": {
+    "layer": 17,
+    "repo": "EleutherAI/sae-SmolLM2-1.7B-layer17-32x",
+    "kind": "topk",
+    "k": 32,
+    "d_model": 2048,
+    "d_sae": 65536,
+    "params_mib": 1024.5,
+    "trained_on": "(see train_config.json)",
+    "d_model_match": true,
+    "roundtrip_mean_L0": 32.0,
+    "roundtrip_fvu_instruct": 0.13803505897521973,
+    "roundtrip_cos_instruct": 0.9282927513122559,
+    "ok": true
+  },
+  "sae_transfer_base_vs_instruct": {
+    "fvu_base": 0.08841550350189209,
+    "fvu_instruct": 0.13803505897521973,
+    "delta_fvu": 0.04961955547332764,
+    "L0_base": 32.0,
+    "L0_instruct": 32.0,
+    "verdict": "dictionary transfers"
+  },
+  "cosine_null": {
+    "d": 2048,
+    "n_pairs": 20000,
+    "analytic_1_over_sqrt_d": 0.022097086912079608,
+    "mean_abs_cos": 0.017718318849802017,
+    "std_abs_cos": 0.01327443402260542,
+    "p50": 0.01504344679415226,
+    "p90": 0.03621698170900345,
+    "p95": 0.043512746691703796,
+    "p99": 0.05604580044746399,
+    "p999": 0.07242758572101593,
+    "max": 0.09019140154123306
+  },
+  "stages": [
+    {
+      "label": "load_model",
+      "seconds": 17.602,
+      "peak_reserved_gib": 3.377,
+      "allocated_gib": 3.188,
+      "ceiling_gib": 7.0,
+      "within_ceiling": true
+    },
+    {
+      "label": "forward_capture(last)",
+      "seconds": 0.394,
+      "peak_reserved_gib": 3.396,
+      "allocated_gib": 3.196,
+      "ceiling_gib": 7.0,
+      "within_ceiling": true
+    },
+    {
+      "label": "forward_capture(all, T=1024)",
+      "seconds": 0.108,
+      "peak_reserved_gib": 3.541,
+      "allocated_gib": 3.196,
+      "ceiling_gib": 7.0,
+      "within_ceiling": true
+    },
+    {
+      "label": "load_sae(layer=17)",
+      "seconds": 1.283,
+      "peak_reserved_gib": 3.396,
+      "allocated_gib": 3.196,
+      "ceiling_gib": 7.0,
+      "within_ceiling": true
+    }
+  ],
+  "audit": {
+    "checks": {
+      "cuda_and_bf16": true,
+      "dims_read_at_runtime": true,
+      "hooks_fire_last_token": true,
+      "hooks_match_hidden_states": true,
+      "no_device_resident_activations": true,
+      "sae_loads_and_roundtrips": true,
+      "cosine_null_generated": true,
+      "peak_vram_under_7.0gib": true
+    },
+    "peak_reserved_gib": 4.883,
+    "all_passed": true
+  }
+}

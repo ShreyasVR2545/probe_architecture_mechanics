@@ -1,0 +1,16 @@
+{
+  "name": "probe_architecture_mechanics",
+  "description": "Mechanistic Interpretability of Probe Architectures & Ensemble Subspaces under Distribution Shift",
+  "topics": [
+    "mechanistic-interpretability",
+    "ai-safety",
+    "sparse-autoencoders",
+    "probe-generalization",
+    "ai-control",
+    "pytorch"
+  ],
+  "note": "Topics are a hosting-platform concept, not native git metadata. Apply with: gh repo edit --add-topic <topic>",
+  "model": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+  "sae": "EleutherAI/sae-SmolLM2-1.7B-layer17-32x",
+  "operative_vram_ceiling_gib": 7.0
+}
