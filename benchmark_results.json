@@ -370,8 +370,154 @@
     "multimax_recall_above_99pct": true,
     "multimax_min_recall_long_ctx": 1.0,
     "memory_scaling_alpha": {
+      "multimax": 0.0,
       "softmax_attn": 0.8418,
+      "mean_pool": 0.0,
       "self_attn": 1.9603
+    },
+    "note_alpha_fix": "alphas were previously filtered with a truthiness test, which dropped probes whose exponent is exactly 0.000 -- the O(1) probes the suite exists to identify. Now keyed on presence.",
+    "crossover_min_strength_recall99": {
+      "multimax": 0.15,
+      "softmax_attn": 0.15,
+      "mean_pool": null
+    },
+    "softmax_dilution_is_strength_dependent": true
+  },
+  "suite_c_crossover": [
+    {
+      "strength": 0.05,
+      "probe": "multimax",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 0.05000000074505806,
+      "auroc_long": 0.5099999904632568,
+      "recall_at_train_length": 0.02500000037252903
+    },
+    {
+      "strength": 0.05,
+      "probe": "softmax_attn",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 0.02500000037252903,
+      "auroc_long": 0.5568749904632568,
+      "recall_at_train_length": 0.05000000074505806
+    },
+    {
+      "strength": 0.05,
+      "probe": "mean_pool",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 0.0,
+      "auroc_long": 0.5406249761581421,
+      "recall_at_train_length": 0.0
+    },
+    {
+      "strength": 0.1,
+      "probe": "multimax",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 0.0,
+      "auroc_long": 0.4818750023841858,
+      "recall_at_train_length": 0.0
+    },
+    {
+      "strength": 0.1,
+      "probe": "softmax_attn",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 0.625,
+      "auroc_long": 0.9556249976158142,
+      "recall_at_train_length": 1.0
+    },
+    {
+      "strength": 0.1,
+      "probe": "mean_pool",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 0.0,
+      "auroc_long": 0.6243749856948853,
+      "recall_at_train_length": 0.4749999940395355
+    },
+    {
+      "strength": 0.15,
+      "probe": "multimax",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 1.0,
+      "auroc_long": 1.0,
+      "recall_at_train_length": 1.0
+    },
+    {
+      "strength": 0.15,
+      "probe": "softmax_attn",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 1.0,
+      "auroc_long": 1.0,
+      "recall_at_train_length": 1.0
+    },
+    {
+      "strength": 0.15,
+      "probe": "mean_pool",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 0.0,
+      "auroc_long": 0.6737499833106995,
+      "recall_at_train_length": 0.949999988079071
+    },
+    {
+      "strength": 0.25,
+      "probe": "multimax",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 1.0,
+      "auroc_long": 1.0,
+      "recall_at_train_length": 1.0
+    },
+    {
+      "strength": 0.25,
+      "probe": "softmax_attn",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 1.0,
+      "auroc_long": 1.0,
+      "recall_at_train_length": 1.0
+    },
+    {
+      "strength": 0.25,
+      "probe": "mean_pool",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 0.20000000298023224,
+      "auroc_long": 0.7581250071525574,
+      "recall_at_train_length": 1.0
+    },
+    {
+      "strength": 0.5,
+      "probe": "multimax",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 1.0,
+      "auroc_long": 1.0,
+      "recall_at_train_length": 1.0
+    },
+    {
+      "strength": 0.5,
+      "probe": "softmax_attn",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 1.0,
+      "auroc_long": 1.0,
+      "recall_at_train_length": 1.0
+    },
+    {
+      "strength": 0.5,
+      "probe": "mean_pool",
+      "k": 4,
+      "N": 16384,
+      "recall_long": 0.4000000059604645,
+      "auroc_long": 0.90625,
+      "recall_at_train_length": 1.0
     }
-  }
+  ]
 }

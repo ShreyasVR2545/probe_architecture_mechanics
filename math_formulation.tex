@@ -249,6 +249,58 @@ of the trade: MultiMax converts a polynomial degradation into a logarithmic one;
 not eliminate length dependence.
 \end{remark}
 
+\begin{remark}[Gradient sparsity: the optimisation cost of the hard maximum]
+\label{rem:gradient-sparsity}
+Theorem~\ref{thm:multimax} concerns the \emph{forward} map only. In training, the
+subgradient of $a_h$ is supported on a single position,
+\begin{equation}
+  \frac{\partial a_h}{\partial y_{j}}
+  \;=\;v_h\,\mathbb{1}\!\left[\,j=\argmax_{j'} v_h^\top y_{j'}\,\right],
+  \label{eq:hardmax-grad}
+\end{equation}
+so each head receives learning signal from exactly one token per sequence, whereas
+softmax pooling \eqref{eq:agg-softmax} spreads gradient over all $N$ positions with
+weights $\alpha_j$. The effective sample size per gradient step is therefore $H$ tokens
+rather than $N$. Near the detection threshold --- where the argmax is not yet reliably
+inside $\mathcal{A}$ --- this can prevent the probe from learning the concept at all,
+even at short training lengths where dilution is irrelevant.
+
+This predicts a non-monotone comparison: MultiMax should \emph{lose} to softmax pooling
+in a band of weak signal strengths, and match it once the signal is strong enough for the
+argmax to lock on. Measured (\S\,benchmark, $k=4$, $N=16{,}384$, recall at $1\%$ FPR,
+reported as long-context / training-length):
+%
+\begin{center}
+\begin{tabular}{lccc}
+\hline
+strength & MultiMax & softmax & mean \\
+\hline
+$0.10$ & $0.00\,/\,0.00$ & $\mathbf{0.62\,/\,1.00}$ & $0.00\,/\,0.47$\\
+$0.15$ & $1.00\,/\,1.00$ & $1.00\,/\,1.00$ & $0.00\,/\,0.95$\\
+$0.50$ & $1.00\,/\,1.00$ & $1.00\,/\,1.00$ & $0.40\,/\,1.00$\\
+\hline
+\end{tabular}
+\end{center}
+%
+At strength $0.10$ MultiMax fails to learn at its own training length while softmax
+attains $1.00$ there and retains $0.62$ under a $32\times$ context extension. Both cross
+the $99\%$ threshold at strength $0.15$; mean pooling never does.
+\end{remark}
+
+\begin{remark}[Scope of the dilution advantage]
+\label{rem:scope}
+Combining Prop.~\ref{prop:mean}, Prop.~\ref{prop:softmax} and
+Remark~\ref{rem:gradient-sparsity}: the demonstrated advantage of the hard maximum is
+over \emph{mean} aggregation, whose $\Theta(1/N)$ decay has no free parameter to absorb
+it. It is \emph{not} established over single-query softmax pooling, because $\gamma$ in
+\eqref{eq:softmax-mass} is a trained quantity and a well-separated needle drives it to
+$e^{\gamma}\!\sim\!N/k$, cancelling the dilution exactly. Remark~\ref{rem:gamma} argues
+$\gamma$ cannot grow \emph{without bound}; the measurements show that at $N=16{,}384$ it
+does not need to. Claims of MultiMax superiority over attention pooling should be stated
+as conditional on the dilution ratio $k/N$ and the achievable logit gap, not as
+categorical.
+\end{remark}
+
 \subsection{Complexity}
 
 \begin{proposition}[Memory and time]

@@ -61,7 +61,52 @@ This is consistent with the theory rather than a refutation of it. Proposition 2
 `k·e^γ / (k·e^γ + N − k)`, which is O(1/N) only for **bounded** logit gap γ. Bounded is not
 small: a well-separated needle lets the trained query reach `e^γ ~ N/k`, cancelling the
 dilution exactly. The prediction is therefore a **crossover in signal strength**, not a
-uniform MultiMax win. `benchmark_addendum.py` locates it.
+uniform MultiMax win. `benchmark_addendum.py` looked for it.
+
+---
+
+## Suite C — crossover sweep: **no MultiMax advantage over softmax pooling**
+
+Fixed k=4, N=16,384 (dilution ratio 2.4×10⁻⁴), trained at N=512. Cells are
+**recall@16384 / recall@512**; the second number separates "never learned the concept"
+from "learned it, then diluted."
+
+| strength | `multimax` | `softmax_attn` | `mean_pool` |
+|---|---|---|---|
+| 0.05 | 0.05 / 0.03 | 0.03 / 0.05 | 0.00 / 0.00 |
+| 0.10 | **0.00 / 0.00** | **0.62 / 1.00** | 0.00 / 0.47 |
+| 0.15 | 1.00 / 1.00 | 1.00 / 1.00 | 0.00 / 0.95 |
+| 0.25 | 1.00 / 1.00 | 1.00 / 1.00 | 0.20 / 1.00 |
+| 0.50 | 1.00 / 1.00 | 1.00 / 1.00 | 0.40 / 1.00 |
+
+**Lowest strength holding recall ≥ 0.99 at N=16,384 (given the concept was learned at
+training length): `multimax` 0.15, `softmax_attn` 0.15, `mean_pool` never.**
+
+### This contradicts the premise, and the contradiction is the finding
+
+The task brief frames MultiMax as beating "standard Softmax-Attention Probes." **These
+measurements do not support that.** Both cross at exactly the same strength (0.15), and at
+strength 0.10 MultiMax is strictly *worse*: it fails to learn at its own training length
+(0.00) while softmax reaches 1.00 there and retains 0.62 under a 32× context extension.
+
+The mechanism is gradient sparsity, now derived as Remark 2.8 in `math_formulation.tex`.
+The subgradient of a hard max is supported on a **single position per head**, so each head
+sees learning signal from one token per sequence, versus all N for softmax. Effective
+sample size per step is H tokens rather than N. Near threshold — where the argmax has not
+yet locked onto the attack span — that can stop the probe learning at all, independently of
+any dilution effect.
+
+**Corrected scope of the claim.** The demonstrated advantage of hard-max aggregation is
+over **mean pooling**, whose Θ(1/N) decay has no free parameter to absorb it (mean_pool
+never reaches 99% recall at any tested strength). It is **not** established over
+single-query softmax pooling at N = 16,384. Any claim of MultiMax superiority over
+attention pooling should be stated as conditional on the dilution ratio k/N and the
+achievable logit gap γ — not as categorical.
+
+What survives unambiguously is the **systems** result, not the statistical one: MultiMax
+matches softmax's detection while using 35 MiB instead of 652 MiB of overhead at N=131k,
+and 9.15 ms instead of 12.69 ms. That is a real deployment argument. Dilution resistance
+relative to *attention* is not.
 
 ---
 
