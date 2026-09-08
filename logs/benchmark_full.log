@@ -40,3 +40,52 @@ SUITE B - contiguous needle, signal-strength sweep
 
    strength          multimax      softmax_attn         mean_pool
               R@16384 / R@512   R@16384 / R@512   R@16384 / R@512
+       0.10       1.00 / 1.00       0.68 / 1.00       0.00 / 0.52
+       0.15       1.00 / 1.00       1.00 / 1.00       0.04 / 0.94
+       0.50       1.00 / 1.00       1.00 / 1.00       0.44 / 1.00
+
+  second number isolates 'never learned it' from 'learned it, then diluted'
+
+======================================================================================
+SUITE C - distributed (non-contiguous, energy-split) signal attack
+======================================================================================
+  total signal budget fixed at 2.0 (= 4 tokens x 0.5); split across m
+  non-contiguous tokens, so per-token magnitude is 2.0/m
+  N_test=16384, trained at N=512 with the SAME m
+
+      m  per-token        multimax    softmax_attn       mean_pool
+      1     2.0000           1.000           1.000           0.140
+      4     0.5000           1.000           1.000           0.140
+     16     0.1250           1.000           1.000           0.140
+     64     0.0312           0.480           0.440           0.100
+    256     0.0078           0.020           0.000           0.060
+
+  Failure boundary (lowest m at which recall < 0.80):
+    multimax       64
+    softmax_attn   64
+    mean_pool      1
+
+======================================================================================
+VERDICTS
+======================================================================================
+  A. memory scaling of the aggregator's own overhead (log-log fit, N>=8192):
+       multimax       alpha = 0.000
+       softmax_attn   alpha = 0.842
+       mean_pool      alpha = 0.000
+       self_attn      alpha = 1.960
+     MultiMax O(1) in N            : CONFIRMED
+     logged OOM (system limit, not crash): ['self_attn']
+
+  B. contiguous needle, does MultiMax learn at low signal after annealing?
+       strength 0.10  multimax 1.00/1.00   softmax 0.68/1.00
+       strength 0.15  multimax 1.00/1.00   softmax 1.00/1.00
+       strength 0.50  multimax 1.00/1.00   softmax 1.00/1.00
+     annealing fixes the strength-0.10 training failure: YES
+
+  C. distributed attack failure boundary (lowest m with recall < 0.80):
+       multimax       64
+       softmax_attn   64
+       mean_pool      1
+
+  -> wrote benchmark_results.json
+exit=0

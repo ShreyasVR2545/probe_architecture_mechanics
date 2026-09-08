@@ -1,145 +1,125 @@
 # Benchmark notes
 
-Hardware: NVIDIA RTX 5070 Laptop, 7.96 GiB VRAM. All figures batch size 1, d = 2048,
-bf16 compute / fp32 reduction, chunk size 4096.
+Hardware: NVIDIA RTX 5070 Laptop, 7.96 GiB VRAM. Batch size 1, d = 2048, bf16 compute /
+fp32 reduction, chunk size 4096. All numbers from a single full run of
+`benchmark_suite.py` (`logs/benchmark_full.log`, exit 0, no warnings under
+`-W error::UserWarning`).
 
 ---
 
 ## Suite A — latency and memory vs context length
 
-Peak memory is reported both raw and as **overhead above the input tensor**. The
-`(1, N, 2048)` bf16 input is 512 MiB at N = 131,072 and dominates raw peak, which is why
-a first run fitted every probe to α ≈ 0.55 and said nothing useful.
+Peak memory is reported as **overhead above the input tensor**, because the
+`(1, N, 2048)` bf16 input is 512 MiB at N = 131,072 and dominates raw peak.
 
-| probe | N=128 | N=1024 | N=8192 | N=32768 | N=131072 | overhead @131k | α (N≥8192) |
+| probe | 128 | 1,024 | 8,192 | 32,768 | 131,072 | overhead @131k | α |
 |---|---|---|---|---|---|---|---|
-| `multimax` | 0.22 ms | 0.25 ms | 0.71 ms | 2.24 ms | **9.15 ms** | **35.1 MiB** | **0.000** |
-| `mean_pool` | 0.21 | 0.24 | 0.71 | 2.24 | 9.31 | 35.1 MiB | 0.000 |
-| `softmax_attn` | 0.24 | 0.27 | 0.75 | 3.25 | 12.69 | 652.1 MiB | 0.842 |
-| `self_attn` | 0.27 | 0.30 | 8.99 | **936.97** | **OOM** | 10381.6 MiB | 1.960 |
+| `multimax` | 0.253 ms | 0.263 | 0.707 | 2.293 | **9.205** | **19.1 MiB** | **0.000** |
+| `mean_pool` | 0.288 | 0.482 | 0.667 | 2.392 | 9.438 | 35.1 MiB | 0.000 |
+| `softmax_attn` | 0.238 | 0.267 | 0.720 | 3.125 | 12.729 | 652.1 MiB | 0.842 |
+| `self_attn` | 0.279 | 0.373 | 9.182 | **1128.474** | **OOM** | 10381.6 MiB | 1.960 |
 
-**Read-off.**
+MultiMax overhead is flat at **19.1 MiB from N = 8,192 through 131,072** — a 16× length
+increase at constant cost. `self_attn` is **492× slower** than MultiMax at N = 32,768 and
+then OOMs, logged as a system limit rather than a crash.
 
-- `multimax` and `mean_pool` are **O(1) in N** in their own footprint (α = 0.000, flat at
-  35.1 MiB from N=8192 to N=131,072) because both stream the sequence in chunks and carry
-  only a running reduction.
-- `softmax_attn` is **O(N)** (α = 0.842): it materialises `(1, N, hidden)` to form the
-  softmax-weighted sum.
-- `self_attn` is **O(N²)** (α = 1.960), reaching 10.1 GiB at N = 32,768 and OOM-ing at
-  131,072. Its latency at N = 32,768 is **937 ms vs 2.24 ms** for `multimax` — a 418×
-  gap before it fails outright.
-
-**Correction to the framing in the task brief.** Single-query attention pooling is
-**O(N), not O(N²)** — its score tensor has shape `(1, N)`. The quadratic cost appears only
-when the probe attends *across* the sequence. Both are measured here so the claim rests on
-data. MultiMax's memory advantage over single-query pooling is the constant-in-N streaming
-reduction (35 MiB vs 652 MiB at 131k), not an asymptotic class separation.
+**Correction to the brief's framing.** Single-query attention pooling is **O(N), not
+O(N²)** — its score tensor is `(1, N)`. Only self-attention is quadratic.
 
 ---
 
-## Suite B — localized attack insertion
+## Suite B — contiguous needle, signal-strength sweep
 
-Attack: `k` consecutive tokens carrying a fixed direction scaled to **unit magnitude per
-coordinate** (`√d` norm), strength 0.5 against background σ = 0.5. Probes trained **only**
-at N = 512; N = 16,384 is strictly out of distribution. Recall at a threshold giving 1% FPR
-on benign sequences of the **same length**.
-
-| probe | k=4 | k=8 | k=16 | @train length |
-|---|---|---|---|---|
-| `multimax` | **1.000** | **1.000** | **1.000** | 1.000 |
-| `softmax_attn` | 1.000 | 1.000 | 1.000 | 1.000 |
-| `mean_pool` | 0.600 | 0.950 | 1.000 | 1.000 |
-
-**The stated claim holds** — MultiMax keeps recall > 99% at every `k` under a 32× context
-extension, dilution ratio k/N = 2.4×10⁻⁴.
-
-**But the comparison at this strength is uninformative, and that is worth stating plainly:
-`softmax_attn` also holds at 1.000.** Only `mean_pool` degrades (0.600 at k=4).
-
-This is consistent with the theory rather than a refutation of it. Proposition 2.4 in
-`math_formulation.tex` bounds the softmax mass on the attack by
-`k·e^γ / (k·e^γ + N − k)`, which is O(1/N) only for **bounded** logit gap γ. Bounded is not
-small: a well-separated needle lets the trained query reach `e^γ ~ N/k`, cancelling the
-dilution exactly. The prediction is therefore a **crossover in signal strength**, not a
-uniform MultiMax win. `benchmark_addendum.py` looked for it.
-
----
-
-## Suite C — crossover sweep: **no MultiMax advantage over softmax pooling**
-
-Fixed k=4, N=16,384 (dilution ratio 2.4×10⁻⁴), trained at N=512. Cells are
-**recall@16384 / recall@512**; the second number separates "never learned the concept"
-from "learned it, then diluted."
+k = 4 contiguous tokens in N = 16,384 (dilution 2.4×10⁻⁴), trained at N = 512. Cells are
+**recall@16384 / recall@512**; the second number separates "never learned it" from
+"learned it, then diluted". MultiMax trained with smooth-max annealing.
 
 | strength | `multimax` | `softmax_attn` | `mean_pool` |
 |---|---|---|---|
-| 0.05 | 0.05 / 0.03 | 0.03 / 0.05 | 0.00 / 0.00 |
-| 0.10 | **0.00 / 0.00** | **0.62 / 1.00** | 0.00 / 0.47 |
-| 0.15 | 1.00 / 1.00 | 1.00 / 1.00 | 0.00 / 0.95 |
-| 0.25 | 1.00 / 1.00 | 1.00 / 1.00 | 0.20 / 1.00 |
-| 0.50 | 1.00 / 1.00 | 1.00 / 1.00 | 0.40 / 1.00 |
+| 0.10 | **1.00 / 1.00** | 0.68 / 1.00 | 0.04 / 0.24 |
+| 0.15 | 1.00 / 1.00 | 1.00 / 1.00 | 0.16 / 0.84 |
+| 0.50 | 1.00 / 1.00 | 1.00 / 1.00 | 0.92 / 1.00 |
 
-**Lowest strength holding recall ≥ 0.99 at N=16,384 (given the concept was learned at
-training length): `multimax` 0.15, `softmax_attn` 0.15, `mean_pool` never.**
-
-### This contradicts the premise, and the contradiction is the finding
-
-The task brief frames MultiMax as beating "standard Softmax-Attention Probes." **These
-measurements do not support that.** Both cross at exactly the same strength (0.15), and at
-strength 0.10 MultiMax is strictly *worse*: it fails to learn at its own training length
-(0.00) while softmax reaches 1.00 there and retains 0.62 under a 32× context extension.
-
-The mechanism is gradient sparsity, now derived as Remark 2.8 in `math_formulation.tex`.
-The subgradient of a hard max is supported on a **single position per head**, so each head
-sees learning signal from one token per sequence, versus all N for softmax. Effective
-sample size per step is H tokens rather than N. Near threshold — where the argmax has not
-yet locked onto the attack span — that can stop the probe learning at all, independently of
-any dilution effect.
-
-**Corrected scope of the claim.** The demonstrated advantage of hard-max aggregation is
-over **mean pooling**, whose Θ(1/N) decay has no free parameter to absorb it (mean_pool
-never reaches 99% recall at any tested strength). It is **not** established over
-single-query softmax pooling at N = 16,384. Any claim of MultiMax superiority over
-attention pooling should be stated as conditional on the dilution ratio k/N and the
-achievable logit gap γ — not as categorical.
-
-What survives unambiguously is the **systems** result, not the statistical one: MultiMax
-matches softmax's detection while using 35 MiB instead of 652 MiB of overhead at N=131k,
-and 9.15 ms instead of 12.69 ms. That is a real deployment argument. Dilution resistance
-relative to *attention* is not.
+**Annealing fixes the failure found in the previous pass.** Without it MultiMax scored
+0.00 / 0.00 at strength 0.10 — it never learned the concept, because the hard-max
+subgradient reaches only H tokens per step. With annealing it reaches 1.00 / 1.00 and
+**leads softmax (0.68)** in the weak-signal regime.
 
 ---
 
-## Measurement bugs found and fixed
+## Suite C — distributed / fragmented attack
 
-1. **Attack vector was unit-norm.** Spread over d = 2048 that is ~0.022 per coordinate
-   against σ = 0.5 — far below the benign extremes a max reduction tracks. MultiMax scored
-   **AUROC 0.484 at its own training length**, i.e. the benchmark was measuring noise. This
-   is exactly the regime Remark 2.9 predicts (`E[max of N sub-Gaussians] = Θ(τ√(2 log N))`),
-   so the module was behaving as derived. Fixed by √d-scaling.
+Total signal budget fixed at S = 2.0, split across m non-contiguous tokens (per-token
+S/m). Mean pooling sees an unchanged sum; a hard max sees a peak falling as 1/m.
+N = 16,384.
 
-2. **Peak memory is input-dominated**, collapsing all four scaling exponents to ≈ 0.55.
-   Fixed by reporting overhead above the input and fitting on N ≥ 8192.
+| m | per-token | `multimax` | `softmax_attn` | `mean_pool` |
+|---|---|---|---|---|
+| 1 | 2.0000 | 1.000 | 1.000 | 0.140 |
+| 4 | 0.5000 | 1.000 | 1.000 | 0.140 |
+| 16 | 0.1250 | 1.000 | 1.000 | 0.140 |
+| **64** | 0.0312 | **0.480** | **0.440** | 0.100 |
+| 256 | 0.0078 | 0.020 | 0.000 | 0.060 |
 
-3. **Verdict dict dropped α = 0.000.** `{... for r in a if r.get("mem_scaling_alpha")}`
-   uses truthiness, so exponents of exactly zero — the O(1) results the suite exists to
-   find — were silently omitted from `benchmark_results.json` while appearing correctly in
-   the console. Fixed to key on presence.
+**Failure boundary (recall < 0.80): `multimax` m=64, `softmax_attn` m=64, `mean_pool`
+m=1.**
+
+Two things worth stating precisely:
+
+1. **The predicted MultiMax-specific vulnerability did not isolate.** Both pooled
+   aggregators fail at the same m. A preliminary `--quick` run at N = 8,192 suggested
+   softmax survived to m = 256; **that did not replicate at N = 16,384**, and the earlier
+   figure is withdrawn.
+2. **The boundary hides a real difference in ranking quality.** At m = 256 both have
+   recall ≈ 0 at a 1% FPR threshold, but AUROC is **0.523 (multimax) vs 0.716
+   (softmax)**. Softmax retains usable ordering after the thresholded detector has
+   failed; the hard max loses its signal more completely once past the boundary.
+
+---
+
+## Calibration (Task 1.3)
+
+| metric | before Platt | after Platt |
+|---|---|---|
+| Brier | 0.0338 | **0.0157** |
+| NLL | 0.1351 | 0.0591 |
+| accuracy | 0.963 | **0.981** |
+
+Budget-driven δ: targets of 1 / 2 / 5 / 10% land at 1.2 / 2.5 / 5.0 / 10.0%.
+
+---
+
+## Bugs found and fixed by the self-healing loop
+
+1. **`torch.clamp` causes zero-gradient trapping** — the exact failure the guard was
+   specified to prevent. Replaced with `STEClamp(torch.autograd.Function)`. Verified at
+   N = 131,072: `sum|param.grad| = 2.81e+05` (alive) vs `0.000e+00` for plain clamp.
+2. **Unnormalised LogSumExp added `H·τ·log N` to the logit** — measured +42 at τ=1,
+   N=512 and +68 at N=16,384. Large *and length-dependent*, so the probe relearned its
+   bias each epoch and met a different offset at deployment length than at training
+   length. Symptom: recall non-monotone in signal strength (1.00 at s=0.15, 0.04 at
+   s=0.50). Fixed with the normalised Boltzmann operator `τ·log((1/N)Σexp(s/τ))`.
+3. **Attack vector was unit-norm** (~0.022 per coordinate vs background σ = 0.5), making
+   MultiMax score AUROC 0.484 at its own training length. Fixed by √d scaling.
+4. **Peak memory is input-dominated**, collapsing all scaling exponents to ≈ 0.55. Fixed
+   by reporting overhead above the input and fitting on N ≥ 8192.
+5. **Verdict dict dropped α = 0.000** via a truthiness filter — precisely the O(1)
+   results the suite exists to identify. Fixed to key on presence.
+6. **Fixed δ = 0.05 escalated 0/160** on a well-calibrated probe. Correct behaviour, but
+   it makes the gate untestable and silently degrades to probe-only. Replaced with
+   `delta_for_escalation_rate()`, since deployments have an escalation budget.
 
 ---
 
 ## Honest limitations
 
-- **Synthetic hidden states.** Suites A and B run on `randn` backgrounds, not real model
-  activations. This is deliberate — it makes N a free parameter on an 8 GiB card — but it
-  means the attack geometry is idealised: a single fixed direction, additive, contiguous.
-  Real misuse features are neither isolated nor axis-aligned.
-- **The needle is contiguous and additive.** An adversary who spreads the signal across
-  many low-magnitude tokens attacks MultiMax specifically, since the max sees only the
-  single best position. That case is untested here.
-- **Threshold drift is not measured over the full ladder.** Remark 2.9 predicts the benign
-  maximum grows as √(2 log N), so a MultiMax threshold needs recalibrating with length.
-  Suite B recalibrates per length by construction; the drift itself is not characterised.
-- **`self_attn` is included as a scaling reference, not a serious baseline.** No one would
-  deploy quadratic attention as a guardrail; it is there to show where the O(N²) claim
-  actually applies.
+- **Synthetic hidden states.** `randn` backgrounds with a single fixed additive attack
+  direction. Real misuse features are neither isolated nor axis-aligned.
+- **Suite C trains on the same m it tests.** The adversary's spread is known at training
+  time, which is generous to the defender; an unknown-m attack is untested.
+- **Threshold drift over length is not characterised.** Remark 2.9 predicts the benign
+  maximum grows as √(2 log N); Suite B recalibrates per length by construction.
+- **The LLM backend is simulated.** `SimulatedLLM` exercises routing and cost arithmetic
+  only; it is not evidence about a real frontier model, and pricing constants are
+  illustrative defaults rather than quoted prices.
+- **LaTeX is structurally validated, not compiled** — no toolchain on this host.

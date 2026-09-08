@@ -1,0 +1,530 @@
+{
+  "env": {
+    "python": "3.14.3",
+    "torch": "2.11.0+cu128",
+    "device": "NVIDIA GeForce RTX 5070 Laptop GPU",
+    "vram_total_gib": 7.96,
+    "d_model": 2048,
+    "quick": false
+  },
+  "suite_a_latency_memory": [
+    {
+      "probe": "multimax",
+      "N": 128,
+      "d_model": 2048,
+      "latency_ms": 0.2531,
+      "ms_per_1k_tokens": 1.97734,
+      "peak_mib": 11.9,
+      "input_mib": 0.5,
+      "overhead_mib": 11.4,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "multimax",
+      "N": 1024,
+      "d_model": 2048,
+      "latency_ms": 0.2627,
+      "ms_per_1k_tokens": 0.25654,
+      "peak_mib": 17.1,
+      "input_mib": 4.0,
+      "overhead_mib": 13.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "multimax",
+      "N": 8192,
+      "d_model": 2048,
+      "latency_ms": 0.707,
+      "ms_per_1k_tokens": 0.0863,
+      "peak_mib": 51.1,
+      "input_mib": 32.0,
+      "overhead_mib": 19.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "multimax",
+      "N": 32768,
+      "d_model": 2048,
+      "latency_ms": 2.293,
+      "ms_per_1k_tokens": 0.06998,
+      "peak_mib": 147.1,
+      "input_mib": 128.0,
+      "overhead_mib": 19.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "multimax",
+      "N": 131072,
+      "d_model": 2048,
+      "latency_ms": 9.2047,
+      "ms_per_1k_tokens": 0.07023,
+      "peak_mib": 531.1,
+      "input_mib": 512.0,
+      "overhead_mib": 19.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "softmax_attn",
+      "N": 128,
+      "d_model": 2048,
+      "latency_ms": 0.2381,
+      "ms_per_1k_tokens": 1.86016,
+      "peak_mib": 12.3,
+      "input_mib": 0.5,
+      "overhead_mib": 11.8,
+      "status": "ok",
+      "mem_scaling_alpha": 0.8418
+    },
+    {
+      "probe": "softmax_attn",
+      "N": 1024,
+      "d_model": 2048,
+      "latency_ms": 0.2673,
+      "ms_per_1k_tokens": 0.26104,
+      "peak_mib": 22.1,
+      "input_mib": 4.0,
+      "overhead_mib": 18.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.8418
+    },
+    {
+      "probe": "softmax_attn",
+      "N": 8192,
+      "d_model": 2048,
+      "latency_ms": 0.72,
+      "ms_per_1k_tokens": 0.08789,
+      "peak_mib": 95.2,
+      "input_mib": 32.0,
+      "overhead_mib": 63.2,
+      "status": "ok",
+      "mem_scaling_alpha": 0.8418
+    },
+    {
+      "probe": "softmax_attn",
+      "N": 32768,
+      "d_model": 2048,
+      "latency_ms": 3.1249,
+      "ms_per_1k_tokens": 0.09536,
+      "peak_mib": 299.4,
+      "input_mib": 128.0,
+      "overhead_mib": 171.4,
+      "status": "ok",
+      "mem_scaling_alpha": 0.8418
+    },
+    {
+      "probe": "softmax_attn",
+      "N": 131072,
+      "d_model": 2048,
+      "latency_ms": 12.7286,
+      "ms_per_1k_tokens": 0.09711,
+      "peak_mib": 1164.1,
+      "input_mib": 512.0,
+      "overhead_mib": 652.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.8418
+    },
+    {
+      "probe": "mean_pool",
+      "N": 128,
+      "d_model": 2048,
+      "latency_ms": 0.2884,
+      "ms_per_1k_tokens": 2.25313,
+      "peak_mib": 12.0,
+      "input_mib": 0.5,
+      "overhead_mib": 11.5,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "mean_pool",
+      "N": 1024,
+      "d_model": 2048,
+      "latency_ms": 0.4824,
+      "ms_per_1k_tokens": 0.47109,
+      "peak_mib": 21.1,
+      "input_mib": 4.0,
+      "overhead_mib": 17.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "mean_pool",
+      "N": 8192,
+      "d_model": 2048,
+      "latency_ms": 0.6669,
+      "ms_per_1k_tokens": 0.08141,
+      "peak_mib": 67.1,
+      "input_mib": 32.0,
+      "overhead_mib": 35.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "mean_pool",
+      "N": 32768,
+      "d_model": 2048,
+      "latency_ms": 2.3916,
+      "ms_per_1k_tokens": 0.07299,
+      "peak_mib": 163.1,
+      "input_mib": 128.0,
+      "overhead_mib": 35.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "mean_pool",
+      "N": 131072,
+      "d_model": 2048,
+      "latency_ms": 9.4383,
+      "ms_per_1k_tokens": 0.07201,
+      "peak_mib": 547.1,
+      "input_mib": 512.0,
+      "overhead_mib": 35.1,
+      "status": "ok",
+      "mem_scaling_alpha": 0.0
+    },
+    {
+      "probe": "self_attn",
+      "N": 128,
+      "d_model": 2048,
+      "latency_ms": 0.2785,
+      "ms_per_1k_tokens": 2.17578,
+      "peak_mib": 15.0,
+      "input_mib": 0.5,
+      "overhead_mib": 14.5,
+      "status": "ok",
+      "mem_scaling_alpha": 1.9603
+    },
+    {
+      "probe": "self_attn",
+      "N": 1024,
+      "d_model": 2048,
+      "latency_ms": 0.3733,
+      "ms_per_1k_tokens": 0.36455,
+      "peak_mib": 32.0,
+      "input_mib": 4.0,
+      "overhead_mib": 28.0,
+      "status": "ok",
+      "mem_scaling_alpha": 1.9603
+    },
+    {
+      "probe": "self_attn",
+      "N": 8192,
+      "d_model": 2048,
+      "latency_ms": 9.1816,
+      "ms_per_1k_tokens": 1.1208,
+      "peak_mib": 717.6,
+      "input_mib": 32.0,
+      "overhead_mib": 685.6,
+      "status": "ok",
+      "mem_scaling_alpha": 1.9603
+    },
+    {
+      "probe": "self_attn",
+      "N": 32768,
+      "d_model": 2048,
+      "latency_ms": 1128.4739,
+      "ms_per_1k_tokens": 34.43829,
+      "peak_mib": 10509.6,
+      "input_mib": 128.0,
+      "overhead_mib": 10381.6,
+      "status": "ok",
+      "mem_scaling_alpha": 1.9603
+    },
+    {
+      "probe": "self_attn",
+      "N": 131072,
+      "d_model": 2048,
+      "latency_ms": null,
+      "ms_per_1k_tokens": null,
+      "peak_mib": null,
+      "status": "OOM",
+      "mem_scaling_alpha": 1.9603
+    }
+  ],
+  "suite_b_strength_sweep": [
+    {
+      "suite": "B",
+      "probe": "multimax",
+      "strength": 0.1,
+      "k": 4,
+      "N_test": 16384,
+      "N_train": 512,
+      "recall_long": 1.0,
+      "recall_train_length": 1.0,
+      "auroc_long": 1.0,
+      "learned_at_train_length": true
+    },
+    {
+      "suite": "B",
+      "probe": "softmax_attn",
+      "strength": 0.1,
+      "k": 4,
+      "N_test": 16384,
+      "N_train": 512,
+      "recall_long": 0.6800000071525574,
+      "recall_train_length": 1.0,
+      "auroc_long": 0.9584000110626221,
+      "learned_at_train_length": true
+    },
+    {
+      "suite": "B",
+      "probe": "mean_pool",
+      "strength": 0.1,
+      "k": 4,
+      "N_test": 16384,
+      "N_train": 512,
+      "recall_long": 0.0,
+      "recall_train_length": 0.5199999809265137,
+      "auroc_long": 0.6176000237464905,
+      "learned_at_train_length": false
+    },
+    {
+      "suite": "B",
+      "probe": "multimax",
+      "strength": 0.15,
+      "k": 4,
+      "N_test": 16384,
+      "N_train": 512,
+      "recall_long": 1.0,
+      "recall_train_length": 1.0,
+      "auroc_long": 1.0,
+      "learned_at_train_length": true
+    },
+    {
+      "suite": "B",
+      "probe": "softmax_attn",
+      "strength": 0.15,
+      "k": 4,
+      "N_test": 16384,
+      "N_train": 512,
+      "recall_long": 1.0,
+      "recall_train_length": 1.0,
+      "auroc_long": 1.0,
+      "learned_at_train_length": true
+    },
+    {
+      "suite": "B",
+      "probe": "mean_pool",
+      "strength": 0.15,
+      "k": 4,
+      "N_test": 16384,
+      "N_train": 512,
+      "recall_long": 0.03999999910593033,
+      "recall_train_length": 0.9399999976158142,
+      "auroc_long": 0.6740000247955322,
+      "learned_at_train_length": false
+    },
+    {
+      "suite": "B",
+      "probe": "multimax",
+      "strength": 0.5,
+      "k": 4,
+      "N_test": 16384,
+      "N_train": 512,
+      "recall_long": 1.0,
+      "recall_train_length": 1.0,
+      "auroc_long": 1.0,
+      "learned_at_train_length": true
+    },
+    {
+      "suite": "B",
+      "probe": "softmax_attn",
+      "strength": 0.5,
+      "k": 4,
+      "N_test": 16384,
+      "N_train": 512,
+      "recall_long": 1.0,
+      "recall_train_length": 1.0,
+      "auroc_long": 1.0,
+      "learned_at_train_length": true
+    },
+    {
+      "suite": "B",
+      "probe": "mean_pool",
+      "strength": 0.5,
+      "k": 4,
+      "N_test": 16384,
+      "N_train": 512,
+      "recall_long": 0.4399999976158142,
+      "recall_train_length": 1.0,
+      "auroc_long": 0.9115999937057495,
+      "learned_at_train_length": true
+    }
+  ],
+  "suite_c_distributed_attack": [
+    {
+      "suite": "C",
+      "probe": "multimax",
+      "m_spread": 1,
+      "per_token_strength": 2.0,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 1.0,
+      "auroc": 1.0
+    },
+    {
+      "suite": "C",
+      "probe": "softmax_attn",
+      "m_spread": 1,
+      "per_token_strength": 2.0,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 1.0,
+      "auroc": 1.0
+    },
+    {
+      "suite": "C",
+      "probe": "mean_pool",
+      "m_spread": 1,
+      "per_token_strength": 2.0,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 0.14000000059604645,
+      "auroc": 0.8019999861717224
+    },
+    {
+      "suite": "C",
+      "probe": "multimax",
+      "m_spread": 4,
+      "per_token_strength": 0.5,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 1.0,
+      "auroc": 1.0
+    },
+    {
+      "suite": "C",
+      "probe": "softmax_attn",
+      "m_spread": 4,
+      "per_token_strength": 0.5,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 1.0,
+      "auroc": 1.0
+    },
+    {
+      "suite": "C",
+      "probe": "mean_pool",
+      "m_spread": 4,
+      "per_token_strength": 0.5,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 0.14000000059604645,
+      "auroc": 0.8399999737739563
+    },
+    {
+      "suite": "C",
+      "probe": "multimax",
+      "m_spread": 16,
+      "per_token_strength": 0.125,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 1.0,
+      "auroc": 1.0
+    },
+    {
+      "suite": "C",
+      "probe": "softmax_attn",
+      "m_spread": 16,
+      "per_token_strength": 0.125,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 1.0,
+      "auroc": 1.0
+    },
+    {
+      "suite": "C",
+      "probe": "mean_pool",
+      "m_spread": 16,
+      "per_token_strength": 0.125,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 0.14000000059604645,
+      "auroc": 0.8303999900817871
+    },
+    {
+      "suite": "C",
+      "probe": "multimax",
+      "m_spread": 64,
+      "per_token_strength": 0.03125,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 0.47999998927116394,
+      "auroc": 0.9408000111579895
+    },
+    {
+      "suite": "C",
+      "probe": "softmax_attn",
+      "m_spread": 64,
+      "per_token_strength": 0.03125,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 0.4399999976158142,
+      "auroc": 0.9228000044822693
+    },
+    {
+      "suite": "C",
+      "probe": "mean_pool",
+      "m_spread": 64,
+      "per_token_strength": 0.03125,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 0.10000000149011612,
+      "auroc": 0.795199990272522
+    },
+    {
+      "suite": "C",
+      "probe": "multimax",
+      "m_spread": 256,
+      "per_token_strength": 0.0078125,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 0.019999999552965164,
+      "auroc": 0.5228000283241272
+    },
+    {
+      "suite": "C",
+      "probe": "softmax_attn",
+      "m_spread": 256,
+      "per_token_strength": 0.0078125,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 0.0,
+      "auroc": 0.7160000205039978
+    },
+    {
+      "suite": "C",
+      "probe": "mean_pool",
+      "m_spread": 256,
+      "per_token_strength": 0.0078125,
+      "total_budget": 2.0,
+      "N_test": 16384,
+      "recall": 0.05999999865889549,
+      "auroc": 0.7527999877929688
+    }
+  ],
+  "verdicts": {
+    "memory_scaling_alpha": {
+      "multimax": 0.0,
+      "softmax_attn": 0.8418,
+      "mean_pool": 0.0,
+      "self_attn": 1.9603
+    },
+    "multimax_memory_is_O1_in_N": true,
+    "logged_oom": [
+      "self_attn"
+    ],
+    "annealing_fixes_low_signal_training": true,
+    "distributed_attack_failure_boundary_m": {
+      "multimax": 64,
+      "softmax_attn": 64,
+      "mean_pool": 1
+    }
+  }
+}
