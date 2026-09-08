@@ -287,18 +287,88 @@ attains $1.00$ there and retains $0.62$ under a $32\times$ context extension. Bo
 the $99\%$ threshold at strength $0.15$; mean pooling never does.
 \end{remark}
 
+\begin{remark}[Smooth-max annealing removes the optimisation failure]
+\label{rem:annealing}
+The sparsity in \eqref{eq:hardmax-grad} is a property of the \emph{training} objective,
+not of the deployed map, so it can be annealed away. Replace the hard maximum by the
+normalised Boltzmann operator
+\begin{equation}
+  \mathrm{smax}_\tau(s)
+  \;=\;\tau\log\!\Big(\tfrac{1}{N}\textstyle\sum_{j=1}^{N} e^{s_j/\tau}\Big),
+  \qquad
+  \mathrm{smax}_\tau(s)\;\xrightarrow[\tau\to 0]{}\;\max_j s_j,
+  \quad
+  \mathrm{smax}_\tau(s)\;\xrightarrow[\tau\to\infty]{}\;\tfrac1N\textstyle\sum_j s_j,
+  \label{eq:boltzmann}
+\end{equation}
+whose gradient $\partial\,\mathrm{smax}_\tau/\partial s_j=\mathrm{softmax}(s/\tau)_j$ is
+dense for $\tau>0$. Annealing $\tau\to 0$ over training recovers the exact hard max at
+deployment, so Theorem~\ref{thm:multimax} still applies to the shipped model.
+
+\begin{center}
+\begin{tabular}{lccc}
+\hline
+strength & MultiMax (no anneal) & MultiMax (annealed) & softmax \\
+\hline
+$0.10$ & $0.00\,/\,0.00$ & $\mathbf{1.00\,/\,1.00}$ & $0.92\,/\,1.00$\\
+$0.15$ & $1.00\,/\,1.00$ & $1.00\,/\,1.00$ & $1.00\,/\,1.00$\\
+$0.50$ & $1.00\,/\,1.00$ & $1.00\,/\,1.00$ & $1.00\,/\,1.00$\\
+\hline
+\end{tabular}
+\end{center}
+
+\textbf{The $1/N$ normalisation in \eqref{eq:boltzmann} is not cosmetic.} Plain
+$\mathrm{LSE}_\tau$ adds $H\tau\log N$ to the logit --- measured at $+42$ for $\tau=1$,
+$N=512$ and $+68$ at $N=16{,}384$. That offset is both large and \emph{length-dependent},
+so an annealing probe must relearn its bias each epoch and meets a different offset at
+deployment length than at training length. The observable symptom was a recall curve
+non-monotone in signal strength ($1.00$ at $s=0.15$, $0.04$ at $s=0.50$).
+\end{remark}
+
+\begin{remark}[Distributed attacks: the structural limit of the maximum]
+\label{rem:distributed}
+Theorem~\ref{thm:multimax} assumes the attack mass is concentrated. An adversary who
+holds the total budget $S$ fixed but spreads it over $m$ non-contiguous tokens presents
+per-token magnitude $S/m$, so
+\begin{equation}
+  \max_j v_h^\top y_j \;=\;\Theta(S/m),
+  \qquad\text{while}\qquad
+  \tfrac1N\textstyle\sum_j v_h^\top y_j \;=\;\Theta(S/N)\ \ \text{is unchanged in } m .
+  \label{eq:distributed}
+\end{equation}
+The max degrades in $m$ while the mean does not: this is the exact dual of
+Proposition~\ref{prop:mean}, and it is the structural price of the hard reduction.
+Measured failure boundary (lowest $m$ with recall $<0.80$, $S=2.0$, $N=16{,}384$):
+MultiMax $m=64$, softmax pooling $m=256$, mean pooling $m=1$. Softmax pooling tolerates
+a $4\times$ wider spread than MultiMax before failing, while mean pooling fails
+immediately for the reason \eqref{eq:mean-snr} gives.
+\end{remark}
+
 \begin{remark}[Scope of the dilution advantage]
 \label{rem:scope}
-Combining Prop.~\ref{prop:mean}, Prop.~\ref{prop:softmax} and
-Remark~\ref{rem:gradient-sparsity}: the demonstrated advantage of the hard maximum is
-over \emph{mean} aggregation, whose $\Theta(1/N)$ decay has no free parameter to absorb
-it. It is \emph{not} established over single-query softmax pooling, because $\gamma$ in
-\eqref{eq:softmax-mass} is a trained quantity and a well-separated needle drives it to
-$e^{\gamma}\!\sim\!N/k$, cancelling the dilution exactly. Remark~\ref{rem:gamma} argues
-$\gamma$ cannot grow \emph{without bound}; the measurements show that at $N=16{,}384$ it
-does not need to. Claims of MultiMax superiority over attention pooling should be stated
-as conditional on the dilution ratio $k/N$ and the achievable logit gap, not as
-categorical.
+Combining Prop.~\ref{prop:mean}, Prop.~\ref{prop:softmax},
+Remark~\ref{rem:annealing} and Remark~\ref{rem:distributed}, the honest statement is
+three-part.
+
+\emph{(i) Against mean aggregation, MultiMax wins unconditionally on concentrated
+attacks.} The $\Theta(1/N)$ decay of Prop.~\ref{prop:mean} has no free parameter to
+absorb it, and mean pooling fails at every measured signal strength.
+
+\emph{(ii) Against single-query softmax pooling, the advantage is conditional and
+narrow.} $\gamma$ in \eqref{eq:softmax-mass} is a \emph{trained} quantity, and a
+well-separated needle drives $e^{\gamma}\!\sim\!N/k$, cancelling the dilution exactly.
+Remark~\ref{rem:gamma} argues $\gamma$ cannot grow without bound; the measurements show
+that at $N=16{,}384$ it does not need to. Post-annealing, MultiMax leads softmax only in
+the weak-signal regime ($1.00$ vs $0.92$ at $s=0.10$) and ties elsewhere. Claims of
+superiority should be stated as conditional on $k/N$ and the achievable logit gap.
+
+\emph{(iii) Against a distributed adversary, MultiMax is strictly worse}
+(Remark~\ref{rem:distributed}): it fails at $m=64$ where softmax pooling survives to
+$m=256$.
+
+The unconditional advantage is therefore the systems one --- $\Theta(1)$ activation
+memory in $N$ by Prop.~\ref{prop:complexity}, measured as $35$\,MiB of overhead at
+$N=131{,}072$ against $652$\,MiB for softmax pooling --- and not a statistical one.
 \end{remark}
 
 \subsection{Complexity}

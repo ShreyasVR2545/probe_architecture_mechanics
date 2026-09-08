@@ -71,6 +71,33 @@ LOGIT_CLAMP: float = 10.0
 
 
 # ======================================================================================
+# Straight-through clamp
+# ======================================================================================
+class STEClamp(torch.autograd.Function):
+    """Hard clamp forward, identity backward.
+
+    torch.clamp has d/dx = 1[|x| < c], i.e. identically zero on the saturated region, so
+    using it as a numerical guard produces exactly the zero-gradient trapping the guard
+    exists to prevent. Measured on a saturated MultiMax logit: grad norm 0.000e+00.
+
+    Forward is the exact clamp the spec requires; backward passes gradient through
+    unchanged so a saturated probe keeps training.
+    """
+
+    @staticmethod
+    def forward(ctx, x: torch.Tensor, lo: float, hi: float) -> torch.Tensor:
+        return x.clamp(lo, hi)
+
+    @staticmethod
+    def backward(ctx, grad_output: torch.Tensor):
+        return grad_output.clone(), None, None
+
+
+def ste_clamp(x: torch.Tensor, lo: float, hi: float) -> torch.Tensor:
+    return STEClamp.apply(x, lo, hi)
+
+
+# ======================================================================================
 # Config
 # ======================================================================================
 @dataclass
@@ -84,6 +111,10 @@ class ProbeConfig:
     chunk_size: int = 4096                        # 0 disables chunking
     logit_clamp: float = LOGIT_CLAMP
     straight_through_clamp: bool = True           # see _ProbeBase._clamp
+    # Smooth-max temperature. tau = 0 is the hard max of the paper model; tau > 0 is the
+    # LogSumExp relaxation used during early training. See MultiMaxProbe.head_activations
+    # and anneal_tau().
+    tau: float = 0.0
 
     def to_dict(self) -> dict:
         d = asdict(self)
@@ -145,10 +176,9 @@ class _ProbeBase(nn.Module):
         """
         c = self.cfg.logit_clamp
         z = logit.to(self.cfg.reduce_dtype)
-        hard = z.clamp(-c, c)
         if not self.cfg.straight_through_clamp:
-            return hard
-        return z + (hard - z).detach()
+            return z.clamp(-c, c)
+        return ste_clamp(z, -c, c)
 
     def raw_logit(self, x: torch.Tensor,
                   attention_mask: torch.Tensor | None = None) -> torch.Tensor:
@@ -216,18 +246,59 @@ class MultiMaxProbe(_ProbeBase):
         B, N, _ = xb.shape
         rd = self.cfg.reduce_dtype
         chunk = self.cfg.chunk_size or N
+        tau = float(self.cfg.tau)
+        H = self.cfg.n_heads
+        neg_inf = float("-inf")
 
-        running = torch.full((B, self.cfg.n_heads), float("-inf"), device=xb.device, dtype=rd)
+        # Streaming reduction. tau = 0 is a running max. tau > 0 is the NORMALISED
+        # smooth max (Boltzmann operator / log-mean-exp),
+        #     smax_tau(s) = tau * log( (1/N) sum_j exp(s_j / tau) )
+        #                 = m + tau * log( (1/N) sum_j exp((s_j - m)/tau) ),
+        # which -> max_j s_j as tau -> 0 and -> mean_j s_j as tau -> infinity.
+        #
+        # The 1/N normalisation is essential and its absence was a real bug. Plain
+        # LogSumExp adds tau*log(N) per head, i.e. +42 to the logit at tau=1, N=512 and
+        # +68 at N=16384 (measured). That offset is both large and LENGTH-DEPENDENT, so
+        # an annealing probe has to re-learn its bias every epoch AND sees a different
+        # offset at deployment length than at training length. Symptom: Suite B recall
+        # was non-monotone in signal strength (1.00 at 0.15, 0.04 at 0.50).
+        #
+        # Both branches keep O(1) activation memory in N: only (B, H) state is carried.
+        m = torch.full((B, H), neg_inf, device=xb.device, dtype=rd)
+        Z = torch.zeros((B, H), device=xb.device, dtype=rd) if tau > 0 else None
+        cnt = 0
+
         for s in range(0, N, chunk):
             e = min(s + chunk, N)
             sc = self._head_scores(xb[:, s:e]).to(rd)             # (B, n, H)
             if attention_mask is not None:
-                m = attention_mask[:, s:e].to(torch.bool).unsqueeze(-1)
-                sc = sc.masked_fill(~m, float("-inf"))
-            running = torch.maximum(running, sc.amax(dim=1))
+                msk = attention_mask[:, s:e].to(torch.bool).unsqueeze(-1)
+                sc = sc.masked_fill(~msk, neg_inf)
+            cm = sc.amax(dim=1)                                    # (B, H)
+            if tau <= 0:
+                m = torch.maximum(m, cm)
+            else:
+                new_m = torch.maximum(m, cm)
+                safe = torch.isfinite(new_m)
+                shift = torch.where(safe, new_m, torch.zeros_like(new_m))
+                # rescale the old accumulator to the new max, then fold in this chunk
+                Z = Z * torch.exp((torch.where(torch.isfinite(m), m, shift) - shift) / tau) \
+                    * torch.isfinite(m).to(rd)
+                Z = Z + torch.exp((sc - shift.unsqueeze(1)) / tau).sum(dim=1)
+                m = new_m
+                cnt += (e - s)
             del sc
-        # A fully-masked sequence would leave -inf; fall back to 0 so the logit stays finite.
-        return torch.where(torch.isfinite(running), running, torch.zeros_like(running))
+
+        if tau > 0:
+            out = m + tau * torch.log((Z / max(cnt, 1)).clamp_min(1e-30))
+        else:
+            out = m
+        # A fully-masked sequence leaves -inf; fall back to 0 so the logit stays finite.
+        return torch.where(torch.isfinite(out), out, torch.zeros_like(out))
+
+    def set_tau(self, tau: float) -> None:
+        """Set the smooth-max temperature (0 = hard max)."""
+        self.cfg.tau = max(float(tau), 0.0)
 
     # -- public ------------------------------------------------------------------------
     def logits(self, x: torch.Tensor, attention_mask: torch.Tensor | None = None) -> torch.Tensor:
@@ -369,6 +440,34 @@ def build_probe(kind: Literal["multimax", "softmax_attn", "self_attn", "mean_poo
     return _REGISTRY[kind](cfg)
 
 
+def anneal_tau(epoch: int, n_epochs: int, tau_start: float = 1.0,
+               frac_anneal: float = 0.6) -> float:
+    """Geometric anneal from `tau_start` to hard max (tau = 0).
+
+    Why this exists. The hard-max subgradient is supported on ONE position per head
+    (d max_j / d y_j = 1[j = argmax]), so a MultiMax probe sees H tokens of learning
+    signal per sequence versus N for softmax pooling. Measured consequence: at attack
+    strength 0.10 the probe failed to learn even at its TRAINING length (recall 0.00),
+    while softmax reached 1.00 there -- a pure optimisation failure, unrelated to
+    dilution, and invisible to the forward-only padding-invariance analysis.
+
+    The LogSumExp relaxation spreads gradient over all positions with softmax weights,
+    so early epochs get a dense signal; tau then decays to 0 so the deployed forward map
+    is exactly the hard max whose padding invariance is the point of the architecture.
+
+    Anneal completes at `frac_anneal` of training, leaving the remaining epochs to
+    fine-tune under the true hard-max objective.
+    """
+    if n_epochs <= 1:
+        return 0.0
+    cutoff = max(1, int(frac_anneal * n_epochs))
+    if epoch >= cutoff:
+        return 0.0
+    # geometric decay tau_start -> ~1e-2 over `cutoff` epochs, then snap to 0
+    frac = epoch / cutoff
+    return float(tau_start * (1e-2 / tau_start) ** frac)
+
+
 # ======================================================================================
 # Self-test
 # ======================================================================================
@@ -418,6 +517,47 @@ if __name__ == "__main__":
           f"({'alive' if g_st > 0 else 'DEAD'})")
     print(f"  grad norm, plain torch.clamp      = {g_hard:.3e} "
           f"({'alive' if g_hard > 0 else 'DEAD  <- the trap the flag avoids'})")
+
+    # 3b. STE clamp must keep PARAMETER gradients alive at production sequence lengths
+    print("\n  STE clamp: parameter-gradient survival at long N (spec: N >= 32768)")
+    for N in (32768, 131072):
+        p.zero_grad(set_to_none=True)
+        xl = torch.randn(1, N, 2048, device=dev, dtype=torch.bfloat16) * 4.0
+        F.binary_cross_entropy_with_logits(p.logits(xl).reshape(1),
+                                           torch.zeros(1, device=dev)).backward()
+        gsum = sum(q.grad.abs().sum().item() for q in p.parameters() if q.grad is not None)
+        raw = p.raw_logit(xl).item()
+        assert gsum > 0, f"parameter gradients dead at N={N}"
+        print(f"    N={N:>7d}  raw logit {raw:>8.2f} (clamped to {cfg.logit_clamp})  "
+              f"sum|param.grad| = {gsum:.4e}  [alive]")
+        del xl
+        torch.cuda.empty_cache()
+    p.zero_grad(set_to_none=True)
+
+    # 3c. Smooth-max must converge to the hard max as tau -> 0
+    print("\n  Smooth-max annealing: LSE_tau -> hard max as tau -> 0")
+    xs = torch.randn(2, 4096, 2048, device=dev)
+    p.set_tau(0.0)
+    hard = p.raw_logit(xs)
+    for tau in (1.0, 0.3, 0.1, 0.01):
+        p.set_tau(tau)
+        d = (p.raw_logit(xs) - hard).abs().max().item()
+        print(f"    tau={tau:<5.2f}  max|LSE - hardmax| = {d:.4f}")
+    p.set_tau(0.0)
+    from multimax_probe import anneal_tau
+    sched = [round(anneal_tau(e, 20), 4) for e in range(0, 20, 3)]
+    print(f"    anneal schedule (20 epochs, sampled): {sched}")
+
+    # gradient density: the reason the schedule exists
+    print("\n  Gradient density (fraction of positions receiving signal):")
+    for tau in (0.0, 0.5):
+        p.set_tau(tau)
+        xg3 = torch.randn(1, 2048, 2048, device=dev, requires_grad=True)
+        p.logits(xg3).sum().backward()
+        frac = (xg3.grad.abs().sum(-1) > 0).float().mean().item()
+        print(f"    tau={tau:<5.2f}  {frac*100:6.2f}% of positions  "
+              f"({'hard max: H heads only' if tau == 0 else 'LSE: dense'})")
+    p.set_tau(0.0)
 
     # 4. dilution: identical needle, growing benign context
     print("\n  Dilution check (same needle, growing benign padding):")

@@ -1,0 +1,42 @@
+env: {'python': '3.14.3', 'torch': '2.11.0+cu128', 'device': 'NVIDIA GeForce RTX 5070 Laptop GPU', 'vram_total_gib': 7.96, 'd_model': 2048, 'quick': False}
+
+======================================================================================
+SUITE A — context-length latency & peak memory  (batch=1, d=2048)
+======================================================================================
+  probe                 N   latency ms   ms/1k tok   peak MiB    overhead    status
+                                                             (above input)
+  multimax            128        0.253      1.9773       11.9        11.4        ok
+  multimax           1024        0.263      0.2565       17.1        13.1        ok
+  multimax           8192        0.707      0.0863       51.1        19.1        ok
+  multimax          32768        2.293      0.0700      147.1        19.1        ok
+  multimax         131072        9.205      0.0702      531.1        19.1        ok
+  softmax_attn        128        0.238      1.8602       12.3        11.8        ok
+  softmax_attn       1024        0.267      0.2610       22.1        18.1        ok
+  softmax_attn       8192        0.720      0.0879       95.2        63.2        ok
+  softmax_attn      32768        3.125      0.0954      299.4       171.4        ok
+  softmax_attn     131072       12.729      0.0971     1164.1       652.1        ok
+  mean_pool           128        0.288      2.2531       12.0        11.5        ok
+  mean_pool          1024        0.482      0.4711       21.1        17.1        ok
+  mean_pool          8192        0.667      0.0814       67.1        35.1        ok
+  mean_pool         32768        2.392      0.0730      163.1        35.1        ok
+  mean_pool        131072        9.438      0.0720      547.1        35.1        ok
+  self_attn           128        0.279      2.1758       15.0        14.5        ok
+  self_attn          1024        0.373      0.3646       32.0        28.0        ok
+  self_attn          8192        9.182      1.1208      717.6       685.6        ok
+  self_attn         32768     1128.474     34.4383    10509.6     10381.6        ok
+  self_attn        131072            -           -          -           -       OOM
+
+  probe            mem scaling alpha              interpretation
+  multimax           0.000                  ~O(1) in N
+  softmax_attn       0.842                       ~O(N)
+  mean_pool          0.000                  ~O(1) in N
+  self_attn          1.960                     ~O(N^2)
+
+======================================================================================
+SUITE B - contiguous needle, signal-strength sweep
+======================================================================================
+  k=4 contiguous tokens in N=16384 (dilution 2.44e-04), trained at N=512
+  MultiMax trained WITH smooth-max annealing; recall @ 1% FPR, 50 pos + 50 neg
+
+   strength          multimax      softmax_attn         mean_pool
+              R@16384 / R@512   R@16384 / R@512   R@16384 / R@512
