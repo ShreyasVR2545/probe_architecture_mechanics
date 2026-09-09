@@ -43,3 +43,14 @@ Thumbs.db
 !artifacts/*.csv
 !figures/*.png
 !figures/*.svg
+
+# ---- LaTeX build artifacts (paper.pdf itself IS tracked) ----
+*.aux
+*.bbl
+*.blg
+*.fls
+*.fdb_latexmk
+*.out
+*.toc
+*.synctex.gz
+paper.log

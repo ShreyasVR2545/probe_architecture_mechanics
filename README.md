@@ -1,148 +1,165 @@
-# Probe Architecture Mechanics
+# Max Duty, Minimum Overhead
 
-**Mechanistic Interpretability of Probe Architectures & Ensemble Subspaces under Distribution Shift**
+**$\mathcal{O}(1)$-Memory Activation Probing and the Scaling Limits of Long-Context Safety Monitors**
 
-Topics: `mechanistic-interpretability` · `ai-safety` · `sparse-autoencoders` · `probe-generalization` · `ai-control` · `pytorch`
+![Python](https://img.shields.io/badge/python-3.14-blue)
+![PyTorch](https://img.shields.io/badge/pytorch-2.11%2Bcu128-ee4c2c)
+![claims](https://img.shields.io/badge/claim%20checks-32%2F32%20passing-brightgreen)
+![context](https://img.shields.io/badge/context-128%20→%20131%2C072-informational)
+![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
-> Note: "topics" are a GitHub-hosting concept, not native git metadata. They are recorded
-> here and in `repo_metadata.json`; the repository description is set in `.git/description`.
+Activation probes are deployed safety infrastructure — shipped inside frontier assistants
+and used as white-box members of untrusted-monitor ensembles. They are also **memory
+bound**: an attention-pooled probe allocates memory proportional to the context, which is
+the one quantity an adversary controls.
 
----
-
-## The question
-
-White-box activation probes are now deployed safety infrastructure — shipped in
-user-facing Gemini, and used as white-box members of untrusted-monitor ensembles in
-Redwood-style AI control protocols. Two published findings sit unexplained next to each
-other:
-
-1. **Probe architecture drives OOD generalization** (Kramár et al., DeepMind): probes fail
-   under production distribution shift, notably short → long context, and "a combination of
-   architecture choice and training on diverse distributions is required for broad
-   generalization." *Why* architecture matters is not explained.
-2. **Diverse monitor ensembles beat homogeneous ones 2.4×** at equal compute (Koran et al.),
-   and the best ensembles have low error-correlation between members. The paper explicitly
-   does not investigate *why* diversity helps.
-
-**Hypothesis (H3-A, primary).** Probe architecture determines *which features the probe
-reads*. Last-token, mean-pooled, EMA and attention-gated probes trained on the same data for
-the same concept converge on measurably different feature bases in an SAE dictionary.
-
-**H3-B (exploratory).** Error-correlation between two probes is predicted by the overlap of
-their SAE feature supports — so ensemble members can be selected from representational
-overlap *before* running the ensemble.
-
-**H3-C.** Architecture-driven feature differences explain generalization differences.
-
-## The guardrail this repo is built around
-
-This is **not** an AUROC bake-off. Every performance number must be accompanied by a
-**mechanistic latent decomposition**: probe weight vectors are projected onto SAE decoder
-directions, and the analysis reports *which sparse latents* each architecture reads, and
-which ones get drowned in background residual noise as context grows.
+This repo isolates **aggregation** as the independent variable, holding the token
+transform fixed, and measures four reductions across $N \in [128,\;131{,}072]$.
 
 ---
 
-## Hardware reality (why the model choice is what it is)
+## Executive summary
 
-The brief specified a 16 GB budget, `< 11.5 GiB` peak, and Llama-3.1-8B or gemma-3-4b-it.
-Measured on this machine:
-
-| Fact | Value |
+| | finding |
 |---|---|
-| GPU | NVIDIA RTX 5070 Laptop |
-| VRAM total / free | **7.96 GiB / 6.83 GiB** |
-| Llama-3.1-8B bf16 | ~16 GiB — does not fit |
-| gemma-3-4b-it bf16 | ~8.6 GiB — exceeds total VRAM |
-| All `google/gemma-*`, `meta-llama/*` | **403 GatedRepoError** on this account |
+| **Systems win** | MultiMax overhead is **flat at 19.1 MiB** from $N{=}8{,}192$ to $131{,}072$ ($\alpha{=}0.000$) vs **652.1 MiB** for softmax pooling ($\alpha{=}0.842$). Self-attention hits 10.1 GiB and OOMs. |
+| **Optimisation fix** | The hard-max subgradient touches only $H$ tokens/step. At $S{=}0.10$ this stopped learning entirely (**0.00** recall). Normalised Boltzmann annealing restores **1.00**. |
+| **Calibration** | Sum-of-maxima logits are upward-biased. Platt scaling cuts Brier **0.0538 → 0.0122**, accuracy **0.931 → 0.988**. |
+| **Honest limit** | Under a fragmented attack MultiMax and softmax **fail together at $m{=}64$**, and past it softmax ranks better (AUROC **0.716 vs 0.523**). We do *not* claim a general detection advantage. |
 
-So both named models are excluded twice over: too large *and* licence-gated. The operative
-ceiling is **7.0 GiB**, not 11.5.
-
-**Chosen pairing — ungated and dimension-matched:**
-
-| Component | Choice |
-|---|---|
-| Model | `HuggingFaceTB/SmolLM2-1.7B-Instruct` (24 layers, d=2048, 8192 ctx, bf16 ≈ 3.4 GiB) |
-| SAE | `EleutherAI/sae-SmolLM2-1.7B-layer17-32x` (TopK, k=32, d_sae=65536, `resid_post` layer 17) |
-| Hook layers | 11, 17, 21 (17 is the SAE site; 11/21 bracket it) |
-
-Measured peak across all Phase-1 stages including an 8192-token forward: **4.883 GiB**.
-
-**Known caveat, measured not assumed.** The SAE was trained on the *base* model
-`HuggingFaceTB/SmolLM2-1.7B`; probing runs on *-Instruct*. Phase 1 quantifies the mismatch:
-
-```
-FVU on base      0.0884
-FVU on instruct  0.1380      delta +0.0496     mean L0 = 32.0 both
-```
-
-The dictionary transfers. Both models remain available so a matched-base control can be run
-for any Phase-3 claim that turns out to be sensitive to this.
-
-If the Gemma licence is later accepted on Hugging Face, `src/common.py::Config` switches to
-`gemma-3-1b-it` + `gemma-scope-2-1b-it` (an *instruct* SAE, no base/instruct mismatch at all)
-by changing four fields — the SAE loader already handles the JumpReLU format.
+> **The defensible claim is architectural.** MultiMax is the right $\Theta(1)$-memory
+> **first stage of a cascade** — not a replacement for inspection.
 
 ---
 
-## Statistical discipline (non-negotiable)
+## Core comparison matrix
 
-Carried from the proposal-stage critique passes:
+| probe | overhead @131k | $\alpha$ | latency @131k | recall @ $S{=}0.10$ | AUROC @ $m{=}256$ |
+|---|---|---|---|---|---|
+| **MultiMax** (ours) | **19.1 MiB** | **0.000** | **9.205 ms** | **1.00** | 0.523 |
+| Mean pooling | 35.1 MiB | 0.000 | 9.438 ms | 0.00 | 0.753 |
+| Softmax attention | 652.1 MiB | 0.842 | 12.729 ms | 0.68 | **0.716** |
+| Self-attention | 10381.6 MiB | 1.960 | **OOM** | — | — |
 
-- **Empirical `1/sqrt(d)` null.** In d=2048, two independent random unit vectors have
-  mean |cos| = **0.0177** (analytic `1/sqrt(d)` = 0.0221), p95 = **0.0435**, p99 = 0.0561.
-  Any reported cosine below p95 is indistinguishable from random. All vector overlaps are
-  reported as percentiles against this null, never as raw numbers.
-- **Split-half positive controls** on every direction estimate.
-- **Causal claims outrank geometric ones** — orthogonal perturbations can be behaviourally
-  equivalent, so geometry alone never establishes functional distinctness.
-- **Random-dictionary control** on every SAE claim.
-- **Black-to-white performance boost** as the headline metric: how much a white-box probe
-  beats the black-box monitor it would replace. Beating chance is not a result.
-
-## A citation caveat carried into this repo
-
-The brief attributes **"MultiMax attention-gated probes"** to Kramár et al.
-(`arXiv:2601.11516`). That paper's abstract describes novel probe architectures for
-long-context generalization but **does not name MultiMax**, and an identical
-"MultiMax / 88% → 3%" claim was traced to a search-engine summary and withdrawn during the
-Pass-3 verification step. The architecture is well-defined and implemented here regardless,
-but it is labelled **`AttnGatedProbe`** in code and described as *attention-gated pooling
-with a hard-max variant*, not attributed to a specific paper's named method, pending a
-full-text read of `2601.11516`.
+Every cell is read from [`benchmark_results.json`](benchmark_results.json) and verified by
+[`tools/check_claims.py`](tools/check_claims.py).
 
 ---
 
-## Layout
+## Figures
 
-```
-01_environment_and_hooks.py        Phase 1 — env, hooks, VRAM ceiling, SAE, null
-02_probe_architectures.py          Phase 2 — 4 probe families, short->long OOD eval
-03_sae_mechanistic_decomposition.py Phase 3 — probe -> SAE latent decomposition, SNR
-04_ensemble_subspace_analysis.py   Phase 4 — ensemble error-vector subspace mechanics
-src/common.py                      config, VRAM accounting, hooks, SAE loader, nulls
-logs/                              JSON reports per phase (committed)
-artifacts/                         derived tables (committed); raw tensors gitignored
-figures/                           plots
-```
+![architecture](figures/fig1_architecture.png)
 
-## Reproducing
+| memory & latency scaling | annealing | distributed attack |
+|---|---|---|
+| ![mem](figures/fig2_memory_scaling.png) | ![anneal](figures/fig3_annealing_recall.png) | ![dist](figures/fig4_distributed_attack.png) |
+
+---
+
+## Mathematical principles
+
+**MultiMax aggregation.** With token features $y_j = \phi(x_j) \in \mathbb{R}^m$:
+
+$$a_h = \max_{1 \le j \le N} v_h^\top y_j, \qquad \text{logit} = \sum_{h=1}^{H} a_h + b$$
+
+Padding is monotone — appending benign tokens can only add candidates to the max, never
+dilute the incumbent.
+
+**Normalised Boltzmann operator** (training only; annealed to the hard max for deployment):
+
+$$\mathrm{smax}_\tau(s) = \tau \log\!\left(\frac{1}{N}\sum_{j=1}^{N} e^{s_j/\tau}\right)
+\;\xrightarrow[\tau \to 0]{}\; \max_j s_j
+\;\qquad\xrightarrow[\tau \to \infty]{}\; \frac1N\sum_j s_j$$
+
+The $1/N$ is **load-bearing**: plain LogSumExp injects $H\tau\log N$ — measured **+42** at
+$\tau{=}1,N{=}512$ and **+68** at $N{=}16{,}384$. Being *length-dependent*, it corrupts the
+train→deploy transfer specifically.
+
+**Straight-through clamp.** `torch.clamp` has derivative $\mathbb{1}[|z|<c]$ — identically
+zero when saturated, so the guard *causes* the vanishing gradient it was added to prevent
+(measured: grad norm `0.000e+00`). We use
+
+$$\widetilde\Pi(z) = z + \mathrm{sg}\!\left(\Pi_{[-c,c]}(z) - z\right), \qquad \widetilde\Pi'(z) \equiv 1$$
+
+**Platt calibration.** $\hat p = \sigma(az + b)$. Temperature scaling alone is
+*structurally* insufficient: a sum of $H$ maxima is upward-biased, and rescaling cannot
+move a mis-centred boundary.
+
+**Budget-driven gate.** Escalate iff $|\hat p - 0.5| < \delta$, with $\delta$ taken as the
+target-rate quantile of $|\hat p - 0.5|$ rather than hard-coded. Targets of 1/2/5/10% land
+at **1.2/2.5/5.0/10.0%**.
+
+---
+
+## Reproducibility
 
 ```bash
-python 01_environment_and_hooks.py     # writes logs/01_environment_report.json
+pip install torch transformers datasets scikit-learn matplotlib
+
+# module self-tests (strict warnings)
+python -W error::UserWarning multimax_probe.py          # STE clamp, annealing, dilution
+python -W error::UserWarning cascading_classifier.py    # Platt calibration + cost model
+
+# benchmarks  (Suite A/B/C ~45 min; Suite D ~5 min on an 8 GiB GPU)
+python benchmark_suite.py            # --quick for a smaller ladder
+python suite_d_chunk_ablation.py     # answers "is O(1) just chunking?"
+
+# verification and artifacts
+python tools/check_claims.py         # 32/32 prose-vs-artifact checks
+python tools/check_tex.py            # LaTeX structure + amsthm numbering
+python make_figures.py               # figures/*.pdf and *.png
+
+# paper
+latexmk -pdf paper.tex               # -> paper.pdf
 ```
 
-## Anchor papers
+> **Note on determinism.** Benchmarks are seeded and reproduce exactly run-to-run on the
+> same device. Figures and paper numbers are generated *from* `benchmark_results.json`, so
+> they cannot drift from the data by hand-editing.
 
-| # | Paper | Role here |
-|---|---|---|
-| 1 | Kramár, Engels, Wang, Chughtai, Shah, Nanda, Conmy — *Building Production-Ready Probes for Gemini* (`2601.11516`, DeepMind) | Probe architectures; short→long context OOD failure |
-| 2 | Koran, Yun, Tetef, Arnav, Bernabeu-Pérez — *Ensemble Monitoring for AI Control* (`2605.15377`) | Heterogeneous vs homogeneous ensembles; error decorrelation |
-| 3 | Natarajan, Jain, Arora, Golechha, Bloom — *One Probe Won't Catch Them All* (`2602.01425`, ICML 2026) | Deception is heterogeneous; 1D directions miss split clusters |
-| 4 | Yoo & Skapars — *Probe Generalization as Subspace Selection* (`2609.02893`) | Principal-subspace overlap as the generalization mechanism |
-| 5 | Greenblatt et al. — Redwood Research AI control corpus | Threat model: low-latency white-box guardrails in control stacks |
+---
 
-Supporting: Chanin et al. *A is for Absorption* (`2409.14507`); Korznikov et al.
-*Sanity Checks for SAEs* (`2602.14111`); Cui et al. *SAE Interventions are Unreliable*
-(`2606.18322`).
+## Directory map
+
+```
+multimax_probe.py            MultiMaxProbe + Softmax/Mean/SelfAttn baselines,
+                             STEClamp(autograd.Function), anneal_tau()
+cascading_classifier.py      Platt calibration, budget-driven delta, cost model
+benchmark_suite.py           Suite A (systems) / B (weak signal) / C (distributed)
+suite_d_chunk_ablation.py    Suite D: chunk x length, the O(1) rebuttal
+make_figures.py              all figures, driven from the JSON artifact
+
+paper.tex / references.bib   manuscript + bibliography
+math_formulation.tex         standalone derivations (18 numbered results)
+BENCHMARK_NOTES.md           measured tables, bugs found, limitations
+
+benchmark_results.json       Suites A-D, verdicts          <- single source of truth
+logs/calibration_report.json Platt metrics + delta sweep
+tools/check_claims.py        verifies prose against artifacts (32 checks)
+tools/check_tex.py           LaTeX structural audit + numbering
+
+01..05_*.py, src/            earlier mechanistic-interpretability phases
+                             (SAE decomposition, ensemble subspaces)
+```
+
+Heavy caches (`artifacts/*.pt`, 143 MB) are gitignored — regenerate with the phase scripts.
+
+---
+
+## Limitations
+
+- **Synthetic activations.** Gaussian backgrounds, one fixed additive attack direction.
+  Real misuse features are neither isolated nor axis-aligned; transfer is untested.
+- **Benchmark C trains on the same $m$ it evaluates** — generous to the defender. An
+  unknown-$m$ adversary is untested.
+- **Threshold drift** grows as $\sqrt{2\log N}$ (benign maximum); the protocol recalibrates
+  per length rather than characterising the drift.
+- **The cascade's second stage is simulated** — it exercises routing and cost arithmetic,
+  and is *not* evidence about a real monitor. Pricing constants are illustrative.
+- **Single scale**: one width, one head count, one GPU.
+- **Figures use Type 3 fonts** — an Application Control policy on the build host blocks
+  fontTools subsetting, so Type 42 is unavailable here.
+
+## License
+
+MIT.

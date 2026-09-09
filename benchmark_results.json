@@ -525,6 +525,162 @@
       "multimax": 64,
       "softmax_attn": 64,
       "mean_pool": 1
+    },
+    "chunk_ablation": {
+      "alpha_in_N_per_chunk": {
+        "512": 0.0,
+        "2048": 0.0,
+        "4096": 0.0,
+        "16384": 0.1673,
+        "65536": 0.5899
+      },
+      "max_abs_alpha_in_N_where_chunking_engages": 0.0,
+      "chunk_sizes_where_chunking_engages": [
+        512,
+        2048,
+        4096
+      ],
+      "law": "overhead = Theta(min(C, N)); constant in N iff C < N",
+      "beta_in_chunk_at_max_N": 0.5104,
+      "overhead_constant_in_N": true,
+      "overhead_governed_by_chunk": true
     }
-  }
+  },
+  "suite_d_chunk_ablation": [
+    {
+      "chunk_size": 512,
+      "N": 8192,
+      "peak_mib": 44.1,
+      "input_mib": 32.0,
+      "overhead_mib": 12.1,
+      "latency_ms": 2.269,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 512,
+      "N": 32768,
+      "peak_mib": 140.1,
+      "input_mib": 128.0,
+      "overhead_mib": 12.1,
+      "latency_ms": 7.052,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 512,
+      "N": 131072,
+      "peak_mib": 524.1,
+      "input_mib": 512.0,
+      "overhead_mib": 12.1,
+      "latency_ms": 28.612,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 2048,
+      "N": 8192,
+      "peak_mib": 47.1,
+      "input_mib": 32.0,
+      "overhead_mib": 15.1,
+      "latency_ms": 0.848,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 2048,
+      "N": 32768,
+      "peak_mib": 143.1,
+      "input_mib": 128.0,
+      "overhead_mib": 15.1,
+      "latency_ms": 3.675,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 2048,
+      "N": 131072,
+      "peak_mib": 527.1,
+      "input_mib": 512.0,
+      "overhead_mib": 15.1,
+      "latency_ms": 12.136,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 4096,
+      "N": 8192,
+      "peak_mib": 51.1,
+      "input_mib": 32.0,
+      "overhead_mib": 19.1,
+      "latency_ms": 0.776,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 4096,
+      "N": 32768,
+      "peak_mib": 147.1,
+      "input_mib": 128.0,
+      "overhead_mib": 19.1,
+      "latency_ms": 2.956,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 4096,
+      "N": 131072,
+      "peak_mib": 531.1,
+      "input_mib": 512.0,
+      "overhead_mib": 19.1,
+      "latency_ms": 8.655,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 16384,
+      "N": 8192,
+      "peak_mib": 59.1,
+      "input_mib": 32.0,
+      "overhead_mib": 27.1,
+      "latency_ms": 0.734,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 16384,
+      "N": 32768,
+      "peak_mib": 171.1,
+      "input_mib": 128.0,
+      "overhead_mib": 43.1,
+      "latency_ms": 2.029,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 16384,
+      "N": 131072,
+      "peak_mib": 555.1,
+      "input_mib": 512.0,
+      "overhead_mib": 43.1,
+      "latency_ms": 7.415,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 65536,
+      "N": 8192,
+      "peak_mib": 59.1,
+      "input_mib": 32.0,
+      "overhead_mib": 27.1,
+      "latency_ms": 0.78,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 65536,
+      "N": 32768,
+      "peak_mib": 203.1,
+      "input_mib": 128.0,
+      "overhead_mib": 75.1,
+      "latency_ms": 2.02,
+      "status": "ok"
+    },
+    {
+      "chunk_size": 65536,
+      "N": 131072,
+      "peak_mib": 651.1,
+      "input_mib": 512.0,
+      "overhead_mib": 139.1,
+      "latency_ms": 7.277,
+      "status": "ok"
+    }
+  ]
 }
