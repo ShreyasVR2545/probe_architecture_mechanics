@@ -310,7 +310,7 @@ deployment, so Theorem~\ref{thm:multimax} still applies to the shipped model.
 \hline
 strength & MultiMax (no anneal) & MultiMax (annealed) & softmax \\
 \hline
-$0.10$ & $0.00\,/\,0.00$ & $\mathbf{1.00\,/\,1.00}$ & $0.92\,/\,1.00$\\
+$0.10$ & $0.00\,/\,0.00$ & $\mathbf{1.00\,/\,1.00}$ & $0.68\,/\,1.00$\\
 $0.15$ & $1.00\,/\,1.00$ & $1.00\,/\,1.00$ & $1.00\,/\,1.00$\\
 $0.50$ & $1.00\,/\,1.00$ & $1.00\,/\,1.00$ & $1.00\,/\,1.00$\\
 \hline
@@ -383,7 +383,7 @@ narrow.} $\gamma$ in \eqref{eq:softmax-mass} is a \emph{trained} quantity, and a
 well-separated needle drives $e^{\gamma}\!\sim\!N/k$, cancelling the dilution exactly.
 Remark~\ref{rem:gamma} argues $\gamma$ cannot grow without bound; the measurements show
 that at $N=16{,}384$ it does not need to. Post-annealing, MultiMax leads softmax only in
-the weak-signal regime ($1.00$ vs $0.92$ at $s=0.10$) and ties elsewhere. Claims of
+the weak-signal regime ($1.00$ vs $0.68$ at $s=0.10$) and ties elsewhere. Claims of
 superiority should be stated as conditional on $k/N$ and the achievable logit gap.
 
 \emph{(iii) Against a distributed adversary, both pooled aggregators fail together}
@@ -416,12 +416,36 @@ For batch size $1$, sequence length $N$, width $m$, heads $H$, and chunk size $C
 \end{equation}
 \end{proposition}
 
-\begin{remark}
+\begin{remark}[Where the quadratic cost actually lives, and what the systems win is]
+\label{rem:complexity-scope}
 Single-query attention pooling is $\Theta(N)$ in memory, not $\Theta(N^2)$: its score
 tensor has shape $(1,N)$. The quadratic term appears only when the probe performs
-self-attention \emph{across} the sequence. MultiMax's advantage over single-query
-pooling is therefore statistical (Theorem~\ref{thm:multimax}), while its advantage in
-memory is the constant-in-$N$ streaming reduction, not an asymptotic separation.
+self-attention \emph{across} the sequence.
+
+Against single-query pooling, then, MultiMax offers no asymptotic memory separation ---
+both are $\Theta(N)$ if the input is counted, and the input is unavoidable. The win is a
+large constant: streaming the reduction keeps the aggregator's \emph{own} overhead at
+$\Theta(1)$ in $N$. Measured overhead above the input tensor, $d=2048$, batch $1$:
+%
+\begin{center}
+\begin{tabular}{lccccc}
+\hline
+$N$ & $128$ & $1{,}024$ & $8{,}192$ & $32{,}768$ & $131{,}072$\\
+\hline
+MultiMax        & $11.4$ & $13.1$ & $19.1$ & $19.1$ & $\mathbf{19.1}$ MiB\\
+softmax pooling & $11.8$ & $18.1$ & $63.2$ & $171.4$ & $\mathbf{652.1}$ MiB\\
+self-attention  & $14.5$ & $28.0$ & $685.6$ & $10381.6$ & OOM\\
+\hline
+\end{tabular}
+\end{center}
+%
+with log--log exponents $\alpha=0.000$, $0.842$ and $1.960$ respectively (fitted on
+$N\ge 8192$). MultiMax overhead is flat across a $16\times$ length increase, and
+self-attention is $492\times$ slower at $N=32{,}768$ before exhausting memory entirely.
+
+Note that this is the \emph{unconditional} advantage. By Remark~\ref{rem:scope} the
+statistical advantage over softmax pooling is conditional and narrow, so the case for
+the hard reduction rests here rather than on Theorem~\ref{thm:multimax} alone.
 \end{remark}
 
 

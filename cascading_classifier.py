@@ -322,7 +322,7 @@ class CascadingClassifier:
         """Choose delta to hit a target escalation rate, instead of fixing it blindly.
 
         Fixing delta and hoping is the wrong interface, and the self-test shows why: once
-        the probe is accurate and calibrated (held-out 0.981, Brier 0.034 -> 0.016) its
+        the probe is accurate and calibrated (held-out 0.988, Brier 0.054 -> 0.012) its
         genuinely-ambiguous region is narrow, so delta = 0.05 escalates 0 of 160 examples.
         That is the system behaving correctly -- there is nothing to route -- but it means
         a hard-coded delta silently becomes probe-only on a good probe and LLM-only on a
@@ -491,6 +491,21 @@ if __name__ == "__main__":
         print(f"  {delta:>7.2f}{r['escalation_rate']*len(idx_ho):>11.0f}"
               f"{r['escalation_rate']:>10.3f}{r['tokens_saved_pct']:>13.1f}%"
               f"{r['cost_reduction_pct']:>9.1f}%{r['cascade_usd']:>13.2f}{a:>7.3f}")
+
+    # Persist calibration + sweep as an artifact so tools/check_claims.py can verify
+    # the documented figures against data rather than trusting the prose.
+    import json as _json, pathlib as _pl
+    _out = _pl.Path(__file__).resolve().parent / 'logs' / 'calibration_report.json'
+    _out.parent.mkdir(exist_ok=True)
+    _out.write_text(_json.dumps({
+        'calibration': casc0.last_calibration,
+        'probe_accuracy_heldout_raw': acc,
+        'budget_delta': [{'target_rate': t_, 'delta': d_, 'n_escalated': n_,
+                          'n': len(idx_ho)} for t_, d_, n_ in budget_rows],
+        'delta_sweep': rows,
+        'backend': rows[0]['backend'], 'simulated': rows[0]['simulated'],
+    }, indent=2, default=str))
+    print('  -> wrote logs/calibration_report.json')
 
     print(f"\nbackend={rows[0]['backend']}  simulated={rows[0]['simulated']}  "
           f"(SimulatedLLM: plumbing + cost model only, not evidence about a real model)")

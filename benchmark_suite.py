@@ -156,7 +156,7 @@ def make_attack_direction(d: int, seed: int = 1234) -> torch.Tensor:
     A unit-NORM direction spreads its mass over d=2048 dimensions (~0.022 per
     coordinate) and is invisible against background sigma=0.5. Measured in a first run:
     MultiMax AUROC 0.484 at its own training length -- the max reduction was tracking
-    benign extremes, exactly the failure mode of Remark 2.9 in math_formulation.tex.
+    benign extremes, exactly the failure mode of `rem:fpr` (Remark 2.8) in math_formulation.tex.
     Scaling by sqrt(d) puts the attack on the same per-coordinate scale as the noise.
     """
     g = torch.Generator().manual_seed(seed)

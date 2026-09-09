@@ -36,9 +36,9 @@ k = 4 contiguous tokens in N = 16,384 (dilution 2.4×10⁻⁴), trained at N = 5
 
 | strength | `multimax` | `softmax_attn` | `mean_pool` |
 |---|---|---|---|
-| 0.10 | **1.00 / 1.00** | 0.68 / 1.00 | 0.04 / 0.24 |
-| 0.15 | 1.00 / 1.00 | 1.00 / 1.00 | 0.16 / 0.84 |
-| 0.50 | 1.00 / 1.00 | 1.00 / 1.00 | 0.92 / 1.00 |
+| 0.10 | **1.00 / 1.00** | 0.68 / 1.00 | 0.00 / 0.52 |
+| 0.15 | 1.00 / 1.00 | 1.00 / 1.00 | 0.04 / 0.94 |
+| 0.50 | 1.00 / 1.00 | 1.00 / 1.00 | 0.44 / 1.00 |
 
 **Annealing fixes the failure found in the previous pass.** Without it MultiMax scored
 0.00 / 0.00 at strength 0.10 — it never learned the concept, because the hard-max
@@ -81,11 +81,16 @@ Two things worth stating precisely:
 
 | metric | before Platt | after Platt |
 |---|---|---|
-| Brier | 0.0338 | **0.0157** |
-| NLL | 0.1351 | 0.0591 |
-| accuracy | 0.963 | **0.981** |
+| Brier | 0.0538 | **0.0122** |
+| NLL | 0.1705 | 0.0474 |
+| accuracy | 0.931 | **0.988** |
 
 Budget-driven δ: targets of 1 / 2 / 5 / 10% land at 1.2 / 2.5 / 5.0 / 10.0%.
+
+> **Superseded figures.** An earlier draft of this table read Brier 0.0338 → 0.0157,
+> accuracy 0.963 → 0.981. Those predate the LSE-normalisation fix (bug 2 below), which
+> changed how the probe trains and therefore its calibration. The values above are from
+> `logs/calibration_report.json` and reproduce exactly across runs.
 
 ---
 
@@ -117,7 +122,7 @@ Budget-driven δ: targets of 1 / 2 / 5 / 10% land at 1.2 / 2.5 / 5.0 / 10.0%.
   direction. Real misuse features are neither isolated nor axis-aligned.
 - **Suite C trains on the same m it tests.** The adversary's spread is known at training
   time, which is generous to the defender; an unknown-m attack is untested.
-- **Threshold drift over length is not characterised.** Remark 2.9 predicts the benign
+- **Threshold drift over length is not characterised.** Remark 2.8 (`rem:fpr`) predicts the benign
   maximum grows as √(2 log N); Suite B recalibrates per length by construction.
 - **The LLM backend is simulated.** `SimulatedLLM` exercises routing and cost arithmetic
   only; it is not evidence about a real frontier model, and pricing constants are
