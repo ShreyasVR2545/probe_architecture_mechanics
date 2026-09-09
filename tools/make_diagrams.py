@@ -105,8 +105,17 @@ class Canvas:
                                           clip_on=False))
 
     def save(self, name):
+        # pad_inches 0.05; the LaTeX float spacing supplies the gap to the text.
+        #
+        # tight_layout() is deliberately NOT called here. These schematics have their
+        # axes switched off and every box is sized by MEASURING rendered text and
+        # converting to data units. tight_layout resizes the axes after that
+        # measurement, so the data-to-display scale changes while the text stays at its
+        # point size, and every label overflows its box. bbox_inches="tight" crops the
+        # canvas without touching the axes, which is what these need.
         for ext in ("pdf", "png"):
-            self.fig.savefig(FIG / f"{name}.{ext}", bbox_inches="tight", pad_inches=0.2)
+            self.fig.savefig(FIG / f"{name}.{ext}", bbox_inches="tight",
+                             pad_inches=0.05)
         plt.close(self.fig)
         print(f"  -> figures/{name}.pdf  +  .png")
 
@@ -127,9 +136,11 @@ def fig_arch_multimax() -> None:
     cxs, cw, ch, _ = c.row(chunks, 6.80, 8.2, grey4, X0)
     for i in range(3):
         c.arrow((cxs[i] + cw, 6.80 + ch / 2), (cxs[i + 1], 6.80 + ch / 2), lw=1.0)
-    ax.text(cxs[0] - 1.30, 6.80 + ch / 2, "residual\nstream " r"$x_{1..N}$",
+    # Moved further left (1.85 rather than 1.30) and the feed arrow shortened to match,
+    # so the label sits in its own column of whitespace instead of crowding chunk 1.
+    ax.text(cxs[0] - 1.85, 6.80 + ch / 2, "residual\nstream " r"$x_{1..N}$",
             ha="center", va="center", fontsize=8.2, color=GREY, linespacing=LS)
-    c.arrow((cxs[0] - 0.55, 6.80 + ch / 2), (cxs[0], 6.80 + ch / 2), lw=1.0)
+    c.arrow((cxs[0] - 0.80, 6.80 + ch / 2), (cxs[0], 6.80 + ch / 2), lw=1.0)
 
     # ==== one chunk expanded ====
     stages = [
@@ -141,28 +152,33 @@ def fig_arch_multimax() -> None:
     ]
     cols = [(PALE["blue"], BLUE), (PALE["blue"], BLUE),
             (PALE["yellow"], ORANGE), (PALE["green"], GREEN)]
-    row_y = 4.44
+    # Lowered from 4.44 to 4.02 to open a clear band inside the top of the container for
+    # the caption. Above the container the caption sat in the corridor the two dotted
+    # expansion lines sweep through, and they ran across the words.
+    row_y = 4.02
     xs, bw, hb, row_w = c.row(stages, row_y, 8.2, cols, X0 + 0.28)
     PX0, PW = X0, row_w + 0.56           # panel wraps the widest row
     ax.text(PX0 + PW / 2, 8.10, "Streaming MultiMax: activation overhead "
                                 r"$\Theta(\min(C,N))$, independent of $N$ once $C<N$",
             ha="center", va="center", fontsize=10.5, weight="bold")
 
-    py0, py1 = 2.10, 6.34
-    ax.plot([cxs[0], PX0], [6.80, py1], color=GREY, lw=0.8, ls=":", clip_on=False)
-    ax.plot([cxs[0] + cw, PX0 + PW], [6.80, py1], color=GREY, lw=0.8, ls=":",
+    # The caption is placed ABOVE the container rather than inside it. That is the
+    # geometric fix: no white mask is needed because the text no longer shares space
+    # with either the dashed border or the two dotted expansion lines, which now
+    # terminate on the container's top corners below it.
+    py0, py1 = 1.28, 6.10
+    ax.plot([cxs[0], PX0], [6.72, py1], color=GREY, lw=0.8, ls=":", clip_on=False)
+    ax.plot([cxs[0] + cw, PX0 + PW], [6.72, py1], color=GREY, lw=0.8, ls=":",
             clip_on=False)
     ax.add_patch(FancyBboxPatch((PX0, py0), PW, py1 - py0,
                                 boxstyle="round,pad=0.01,rounding_size=0.03",
                                 facecolor="white", edgecolor=GREY, linewidth=1.0,
                                 linestyle="--", zorder=0, clip_on=False))
-    # Top padding of 0.40 rather than 0.26, and an opaque background patch behind the
-    # text: previously the caption sat on the dashed container border and the two dotted
-    # expansion lines ran straight through the words.
-    ax.text(PX0 + 0.30, py1 - 0.40,
+    # Inside the container, in the band opened above the stage row. The dotted lines
+    # terminate on the container's top corners, above this, so nothing crosses it.
+    ax.text(PX0 + 0.30, py1 - 0.34,
             "per-chunk work (repeats; allocates nothing that persists)",
-            fontsize=8.0, color=GREY, style="italic", ha="left", va="center", zorder=4,
-            bbox=dict(boxstyle="round,pad=0.22", facecolor="white", edgecolor="none"))
+            fontsize=8.0, color=GREY, style="italic", ha="left", va="center", zorder=4)
 
     for i in range(3):
         c.arrow((xs[i] + bw, row_y + hb / 2), (xs[i + 1], row_y + hb / 2))
@@ -172,24 +188,23 @@ def fig_arch_multimax() -> None:
           r"size does not depend on $N$")
     sw = c.fit_w(st, 8.2, "bold")
     sh = c.fit_h(st, 8.2, "bold")
-    sx, sy = PX0 + PW - sw - 0.28, 3.16
+    # The state box is dropped to 2.86 and the merge arrow lengthened accordingly, so the
+    # arrowhead lands in clear space above the box rather than against its top edge.
+    sx, sy = PX0 + PW - sw - 0.28, 2.48
     c.box(sx, sy, sw, st, PALE["green"], GREEN, fs=8.2, weight="bold", h=sh)
-    c.arrow((xs[3] + bw / 2, row_y), (sx + sw * 0.78, sy + sh), color=GREEN, lw=1.5)
+    c.arrow((xs[3] + bw / 2, row_y), (sx + sw * 0.78, sy + sh + 0.06), color=GREEN,
+            lw=1.5)
 
-    # Feedback routed BELOW the state box, never through it: an earlier version ran the
-    # line across the box and dropped its label on top of the box text.
-    y_fb = sy - 0.46
+    # Feedback routed BELOW the state box, never through it. The horizontal run is
+    # shortened at both ends so the label below it is bounded by whitespace, not by the
+    # dashes: this is why no background mask is needed here any more.
+    y_fb = sy - 0.62
     x_ret = xs[0] + bw / 2
     c.arrow((sx + 0.55, sy), (sx + 0.55, y_fb), color=GREEN, lw=1.3, ls=(0, (4, 2)))
     c.arrow((sx + 0.55, y_fb), (x_ret, y_fb), color=GREEN, lw=1.3, ls=(0, (4, 2)))
     c.arrow((x_ret, y_fb), (x_ret, row_y), color=GREEN, lw=1.3, ls=(0, (4, 2)))
-    # Label sits BELOW the feedback line: placed above, it was struck through by the
-    # horizontal dashes and ran into the vertical drop segment.
-    # Opaque backing so the dashed feedback line does not run through the words, and so
-    # the label does not collide with the maths in the boxes above it.
-    ax.text((x_ret + sx + 0.55) / 2, y_fb - 0.16, "next chunk reuses the same buffer",
-            fontsize=7.8, color=GREEN, ha="center", va="top", style="italic", zorder=5,
-            bbox=dict(boxstyle="round,pad=0.20", facecolor="white", edgecolor="none"))
+    ax.text((x_ret + sx + 0.55) / 2, y_fb - 0.20, "next chunk reuses the same buffer",
+            fontsize=7.8, color=GREEN, ha="center", va="top", style="italic", zorder=5)
 
     # ==== the two training-time mechanisms ====
     # Two lines each. The explanatory third line these boxes used to carry now lives in
@@ -200,11 +215,11 @@ def fig_arch_multimax() -> None:
     t2 = ("straight-through clamp (bounded link)\n"
           r"forward $\Pi_{[-c,c]}(z)$,   backward $\equiv 1$")
     mech_cols = [(PALE["yellow"], ORANGE), (PALE["orange"], ORANGE)]
-    mxs, mw, mh, mrow_w = c.row([t1, t2], 0.42, 8.0, mech_cols,
+    mxs, mw, mh, mrow_w = c.row([t1, t2], 0.05, 8.0, mech_cols,
                                 PX0 + max(0.0, (PW - 2 * 5.0 - 0.45)) / 2, gap=0.45)
-    c.arrow((xs[2] + bw / 2, row_y), (mxs[0] + mw * 0.55, 0.42 + mh),
+    c.arrow((xs[2] + bw / 2, row_y), (mxs[0] + mw * 0.55, 0.05 + mh),
             color=ORANGE, lw=1.0, ls=(0, (3, 2)), rad=0.20)
-    c.arrow((sx + sw, sy + sh / 2), (mxs[1] + mw * 0.55, 0.42 + mh),
+    c.arrow((sx + sw, sy + sh / 2), (mxs[1] + mw * 0.55, 0.05 + mh),
             color=ORANGE, lw=1.0, ls=(0, (3, 2)), rad=-0.20)
 
     c.save("fig_arch_multimax")
@@ -241,28 +256,26 @@ def fig_cascade_pipeline() -> None:
     t_ok = "confident:\ndecide now,\nno stage-2 cost"
     t_esc = "Stage 2:\nSGuard ContentFilter 2B\nfull forward pass"
     rw = max(c.fit_w(t_ok, 8.2), c.fit_w(t_esc, 8.2, "bold"))
-    rx = gate_r + 0.55
+    rx = gate_r + 1.05
 
-    # Branch labels sit at the MIDPOINT of each connector with an opaque backing. Placed
-    # at rx - 0.30 they straddled the left edge of the destination boxes and were cut by
-    # the box outline.
+    # Branch labels are separated GEOMETRICALLY, not masked. The connector gap is
+    # widened to 1.05 and each label is anchored just inside the gate side of it, so the
+    # label occupies clear canvas between the gate and its destination box. No white
+    # background patch is used anywhere in this diagram.
     hok = c.fit_h(t_ok, 8.2)
-    ok_y = row_y + h + 0.34
+    ok_y = row_y + h + 0.46
     c.box(rx, ok_y, rw, t_ok, PALE["green"], GREEN, fs=8.2, h=hok)
     c.arrow((gate_r, mid + h * 0.20), (rx, ok_y + hok / 2), color=GREEN, lw=1.4, rad=0.18)
-    ax.text((gate_r + rx) / 2, (mid + h * 0.20 + ok_y + hok / 2) / 2 + 0.22, "no",
-            fontsize=8.2, color=GREEN, weight="bold", ha="center", va="center", zorder=6,
-            bbox=dict(boxstyle="round,pad=0.16", facecolor="white", edgecolor="none"))
+    ax.text(gate_r + 0.24, mid + h * 0.20 + 0.46, "no", fontsize=8.2, color=GREEN,
+            weight="bold", ha="left", va="bottom", zorder=6)
 
     hesc = c.fit_h(t_esc, 8.2, "bold")
-    esc_y = row_y - hesc - 0.38
+    esc_y = row_y - hesc - 0.50
     c.box(rx, esc_y, rw, t_esc, PALE["orange"], ORANGE, fs=8.2, weight="bold", h=hesc)
     c.arrow((gate_r, mid - h * 0.20), (rx, esc_y + hesc / 2), color=ORANGE, lw=1.4,
             rad=-0.18)
-    ax.text((gate_r + rx) / 2, (mid - h * 0.20 + esc_y + hesc / 2) / 2 - 0.22, "yes",
-            fontsize=8.2, color=ORANGE, weight="bold", ha="center", va="center",
-            zorder=6,
-            bbox=dict(boxstyle="round,pad=0.16", facecolor="white", edgecolor="none"))
+    ax.text(gate_r + 0.24, mid - h * 0.20 - 0.46, "yes", fontsize=8.2, color=ORANGE,
+            weight="bold", ha="left", va="top", zorder=6)
 
     total_w = rx + rw - PX0
     ax.text(PX0 + total_w / 2, 6.52,

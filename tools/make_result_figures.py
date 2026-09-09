@@ -42,20 +42,29 @@ plt.rcParams.update({
     "pdf.fonttype": 3, "ps.fonttype": 3,      # see make_figures.py for why not 42
 })
 
-# Legends are opaque and sit above everything. A translucent legend laid over a curve
-# reads as a collision even when it is technically "behind" the data, and a transparent
-# one lets grid lines strike through the labels.
-LEG = dict(frameon=True, framealpha=1.0, facecolor="white", edgecolor="0.8",
-           borderpad=0.4, handlelength=1.6, labelspacing=0.35)
+# One legend style for every figure: a rounded, near-opaque white frame with a light
+# grey edge. The frame is set explicitly rather than through rcParams so the same call
+# works for figure-level legends too.
+LEG = dict(frameon=True, fancybox=True, borderpad=0.45, handlelength=1.7,
+           labelspacing=0.38)
+
+
+def style_frame(lg):
+    if lg is None:
+        return lg
+    fr = lg.get_frame()
+    fr.set_facecolor("white")
+    fr.set_alpha(0.9)
+    fr.set_edgecolor("#cccccc")
+    fr.set_linewidth(0.8)
+    lg.set_zorder(20)
+    return lg
 
 
 def legend(ax, **kw):
     opts = dict(LEG)
     opts.update(kw)
-    lg = ax.legend(**opts)
-    if lg is not None:
-        lg.set_zorder(20)
-    return lg
+    return style_frame(ax.legend(**opts))
 
 
 def text_on(color) -> str:
@@ -83,8 +92,12 @@ def load(name):
 
 
 def save(fig, name):
+    # pad_inches 0.05, not 0.2: separation from the text block is the job of the LaTeX
+    # float spacing (\textfloatsep / \intextsep), and baking it into the image as well
+    # double-counts it and wastes vertical space on a 24-page budget.
+    fig.tight_layout()
     for ext in ("pdf", "png"):
-        fig.savefig(FIG / f"{name}.{ext}", bbox_inches="tight", pad_inches=0.2)
+        fig.savefig(FIG / f"{name}.{ext}", bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
     print(f"  -> figures/{name}.pdf  +  .png")
 
@@ -126,17 +139,18 @@ def fig_real_llm():
             rs = [r["auroc"] for r in det if r["layer"] == L and r["probe"] == kind]
             vals.append(float(np.mean(rs)) if rs else np.nan)
         ax.bar(x + i * w - 0.4 + w / 2, vals, w * 0.92, color=C[kind], label=LBL[kind])
-    ax.axhline(0.5, color="0.35", lw=0.9, ls="--")
-    # 'chance' on the LEFT: at the right edge it sat under the legend and was unreadable.
-    ax.text(-0.30, 0.515, "chance", fontsize=7.5, color="0.35", ha="left", va="bottom")
+    ax.axhline(0.5, color="0.35", lw=0.9, ls="--", zorder=1)
+    # 'chance' sits in the gap BETWEEN the layer-24 and layer-31 bar groups, just above
+    # the dashed line. Both edges of the axis are occupied: the left by the y-axis, the
+    # right by the tallest layer-31 bar, so an interior gap is the only clean anchor.
+    ax.text(1.5, 0.525, "chance", fontsize=7.2, color="0.35", ha="center", va="bottom")
     ax.set_xticks(x)
     ax.set_xticklabels([f"layer {L}" for L in layers])
     ax.set_ylabel("AUROC (mean over $N$)")
-    # Headroom above the tallest bar (0.86) so the legend clears the data entirely; at
-    # 'lower right' it cut through the layer-24 and layer-31 bars and the chance line.
-    ax.set_ylim(0.35, 1.28)
+    # Headroom above the tallest bar (0.86) so the legend band never meets the data.
+    ax.set_ylim(0.35, 1.30)
     ax.set_title("(b) detection on real residuals")
-    legend(ax, loc="upper center", ncol=3, fontsize=6.6, columnspacing=1.0)
+    legend(ax, loc="upper right", bbox_to_anchor=(1.0, 1.02), ncol=1, fontsize=6.6)
     fig.tight_layout()
     save(fig, "fig_real_llm_performance")
 
@@ -192,18 +206,22 @@ def fig_ablation():
     ax.bar(x - 0.19, on, 0.36, color="#0072B2", label="straight-through", zorder=3)
     ax.bar(x + 0.19, [max(v, 0) for v in off], 0.36, color="#D55E00",
            label="plain clamp", zorder=3)
-    # Annotate the zero bars flat on the baseline. Rotated 90 degrees and floated at 3%
-    # of the axis they read as detached labels colliding with the tick text.
+    # The zero-height bars are labelled ABOVE the paired blue bar, not on the baseline:
+    # at the baseline the label sat between the two bars and crowded the blue rect and
+    # the tick text. Lifting it clear of both gives it unambiguous ownership.
     for xi, v in zip(x + 0.19, off):
         if v == 0:
-            ax.annotate("0.000", xy=(xi, 0), xytext=(0, 3), textcoords="offset points",
-                        ha="center", va="bottom", fontsize=6.8, color="#D55E00",
-                        zorder=6)
+            # Short label, centred over the orange bar's own slot and lifted above the
+            # blue bar top. Spelling out "plain clamp: 0.000" was tried and the three
+            # labels ran into each other; the legend already carries the series name.
+            ax.annotate("0.000", xy=(xi, max(on)), xytext=(0, 7),
+                        textcoords="offset points", ha="center", va="bottom",
+                        fontsize=6.8, color="#D55E00", zorder=6)
     ax.set_xticks(x)
     ax.set_xticklabels(dts)
     ax.set_ylabel("gradient norm under saturation")
-    # Headroom so the legend sits above the bars rather than against their tops.
-    ax.set_ylim(0, max(on) * 1.34)
+    # 20% top headroom: room for the value labels AND a legend above them.
+    ax.set_ylim(0, max(on) * 1.52)
     ax.set_title("(c) STE vs plain clamp")
     legend(ax, loc="upper center", ncol=1, fontsize=7)
     fig.tight_layout()
@@ -250,7 +268,10 @@ def fig_drift_cal():
     ax.set_xlabel(r"$\sqrt{\log N}$")
     ax.set_ylabel(r"$\mathbb{E}[\max_j \varepsilon_j]$")
     ax.set_title("(b) benign-maximum drift")
-    legend(ax, loc="lower right", fontsize=6.6)
+    # Top-left quadrant is the empty one here: both the measured series and the theory
+    # line run bottom-left to top-right, so anything anchored right meets a trajectory.
+    ax.set_ylim(top=ax.get_ylim()[1] + 0.9)
+    legend(ax, loc="upper left", fontsize=6.5)
 
     # Panel (c) redesigned. As grouped bars on a linear axis it showed exactly one
     # visible rectangle: the Brier scores are ~1e-8 (transferred) and ~1e-12 (per
@@ -275,21 +296,31 @@ def fig_drift_cal():
     # finding. The Brier numbers are stated instead, with the threshold that would
     # actually matter, so the panel cannot be misread as showing a penalty.
     worst = max(r["brier_transferred"] for r in rows)
-    ax.set_ylim(min(r["mean_logit"] for r in rows) - 0.25,
-                max(r["mean_logit"] for r in rows) + 0.75)
+    lo = min(r["mean_logit"] for r in rows)
+    hi = max(r["mean_logit"] for r in rows)
+    # Generous top margin so the two text blocks live in genuine empty canvas above the
+    # curve rather than being masked onto it.
+    ax.set_ylim(lo - 0.22, hi + 1.35)
     ax.set_ylabel("mean logit")
     ax.tick_params(axis="y", labelcolor="black")
+    # The drift label is placed up and to the LEFT of the final point, with a short
+    # leader to the point it describes. The curve rises left-to-right, so the region
+    # above its midpoint is empty and the leader crosses nothing.
     ax.annotate(rf"drift $={drift:.2f}$ logits",
-                xy=(x[-1], rows[-1]["mean_logit"]), xytext=(-8, -16),
-                textcoords="offset points", fontsize=7.0, color="#0072B2", ha="right",
-                zorder=6)
+                xy=(x[-1], hi), xytext=(x[-1] - 0.30, hi + 0.42),
+                textcoords="data", fontsize=7.0, color="#0072B2",
+                ha="right", va="bottom", zorder=6,
+                arrowprops=dict(arrowstyle="-", color="#0072B2", lw=0.7,
+                                shrinkA=2, shrinkB=3))
     mant, exp = f"{worst:.1e}".split("e")          # from the artifact, never typed in
+    # Top LEFT. The curve rises from bottom-left to top-right, so the bottom band is
+    # occupied at its left end (where the curve starts) and only the upper left is
+    # genuinely free; anchored bottom-right the note lay across the curve's first leg.
     ax.text(0.03, 0.97,
             rf"Brier $\leq {mant}\times10^{{{int(exp)}}}$ at every $N$" "\n"
             r"($0.01$ would be a penalty that matters)",
-            transform=ax.transAxes, fontsize=6.6, color="0.30", va="top", ha="left",
-            zorder=6,
-            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="0.85"))
+            transform=ax.transAxes, fontsize=6.4, color="0.30", va="top", ha="left",
+            zorder=6, linespacing=1.4)
     fig.tight_layout()
     save(fig, "fig_drift_and_calibration")
 
@@ -320,10 +351,13 @@ def fig_mixed_frag():
     # Five entries will not fit inside (a) without covering the mean-pooling curve and
     # the chance line, which is where they were. Panel (b) is nearly empty between 0.4
     # and 0.7, so the shared legend goes there and costs no extra figure height.
+    # Shared legend in the open middle band of (b): the two series there sit at 1.00 and
+    # around 0.75, leaving 0.40-0.68 empty across the full width. 'lower center' put it
+    # on the chance line and against the frame.
+    axes[1].set_ylim(0.30, 1.06)
     handles, labels = axes[0].get_legend_handles_labels()
-    lg = axes[1].legend(handles, labels, loc="lower center", ncol=2, fontsize=6.4,
-                        columnspacing=1.0, **LEG)
-    lg.set_zorder(20)
+    style_frame(axes[1].legend(handles, labels, loc="center", bbox_to_anchor=(0.5, 0.26),
+                               ncol=2, fontsize=6.3, columnspacing=1.0, **LEG))
 
     ax = axes[2]
     bt = [r for r in d["batched"] if not r.get("oom")]
@@ -338,10 +372,11 @@ def fig_mixed_frag():
     ax.set_xlabel(r"batch size $B$ at $N{=}65{,}536$")
     ax.set_ylabel("overhead above input (MiB)")
     ax.set_title("(c) batched systems cost")
-    # Upper left, above the softmax curve. 'lower right' was tried and is worse: the
-    # MultiMax curve climbs straight through that corner.
-    ax.set_ylim(5, 2e4)
-    legend(ax, loc="upper left", fontsize=7)
+    # Both curves climb left-to-right, so the legend goes in a band ABOVE both of them
+    # rather than beside either. 'lower right' was tried and is worse: the MultiMax
+    # curve runs straight through that corner.
+    ax.set_ylim(5, 1.2e5)
+    legend(ax, loc="upper left", fontsize=6.8)
     fig.tight_layout()
     save(fig, "fig_mixed_fragmentation")
 
@@ -395,7 +430,11 @@ def fig_pareto_top_r():
     ax.set_xlabel(r"top-$r$")
     ax.set_ylabel(r"best AUROC over $m$")
     ax.set_title(r"(c) where $r$ earns its cost")
-    legend(ax, loc="center right", fontsize=7)
+    # Both trajectories occupy 0.59-0.91, so the legend goes in a band opened above
+    # them. Anchored at 'center right' it crossed the layer-16 line.
+    ylo, yhi = ax.get_ylim()
+    ax.set_ylim(ylo, yhi + 0.16 * (yhi - ylo))
+    legend(ax, loc="upper center", ncol=2, fontsize=6.8, columnspacing=1.0)
     fig.tight_layout()
     save(fig, "fig_pareto_top_r")
 

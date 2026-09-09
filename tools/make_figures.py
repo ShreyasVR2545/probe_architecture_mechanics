@@ -47,11 +47,32 @@ LBL = {"multimax": "MultiMax (ours)", "softmax_attn": "Softmax attention",
        "mean_pool": "Mean pooling", "self_attn": "Self-attention"}
 
 
+def style_legend(lg):
+    """White, 90% opaque, light grey rounded frame: one style everywhere."""
+    if lg is None:
+        return lg
+    fr = lg.get_frame()
+    fr.set_facecolor("white")
+    fr.set_alpha(0.9)
+    fr.set_edgecolor("#cccccc")
+    fr.set_linewidth(0.8)
+    lg.set_zorder(20)
+    return lg
+
+
 def save(fig, name: str) -> None:
+    # pad_inches 0.05: separation from the text block is supplied by the LaTeX float
+    # spacing, so baking 0.2in into the image double-counts it.
+    #
+    # tight_layout only on figures with visible axes. fig1_architecture is a schematic
+    # laid out in data coordinates with the axes off; tight_layout rescales the axes
+    # after the layout was computed and pushes every label out of its card.
+    if any(a.axison for a in fig.axes):
+        fig.tight_layout()
     for ext in ("pdf", "png"):
         # explicit margin: bbox_inches="tight" alone crops to the ink, leaving figures
         # butting against the text block once includegraphics scales them.
-        fig.savefig(FIG / f"{name}.{ext}", bbox_inches="tight", pad_inches=0.2)
+        fig.savefig(FIG / f"{name}.{ext}", bbox_inches="tight", pad_inches=0.05)
     plt.close(fig)
     print(f"  -> figures/{name}.pdf  +  .png")
 
@@ -177,7 +198,10 @@ def fig2_memory(d: dict) -> None:
                    marker="s", ms=4.5, color=C[k], label=LBL[k])
     for x in [x for x in A if x["status"] == "OOM"]:
         ax[0].scatter([x["N"]], [1.3e4], marker="X", s=80, color=C[x["probe"]], zorder=5)
-        ax[0].annotate("OOM", (x["N"], 1.3e4), fontsize=8.5, ha="center",
+        # Lifted 14pt above the marker centre. Anchored at the marker the text sat
+        # directly on the upper arms of the X.
+        ax[0].annotate("OOM", (x["N"], 1.3e4), xytext=(0, 14),
+                       textcoords="offset points", fontsize=8.5, ha="center",
                        va="bottom", color=C[x["probe"]], weight="bold")
     for a, t, yl in ((ax[0], "Activation overhead above input", "MiB"),
                      (ax[1], "Forward latency", "ms")):
@@ -186,8 +210,8 @@ def fig2_memory(d: dict) -> None:
         a.set_xlabel("context length $N$")
         a.set_ylabel(yl)
         a.set_title(t)
-    ax[0].legend(loc="upper left")
-    ax[1].legend(loc="upper left")
+    style_legend(ax[0].legend(loc="upper left"))
+    style_legend(ax[1].legend(loc="upper left"))
 
     D = d.get("suite_d_chunk_ablation", [])
     if D:
@@ -199,7 +223,7 @@ def fig2_memory(d: dict) -> None:
         ax[2].set_xlabel("context length $N$")
         ax[2].set_ylabel("MiB")
         ax[2].set_title(r"Chunk ablation: $\Theta(\min(C,N))$")
-        ax[2].legend(ncol=2, fontsize=8)
+        style_legend(ax[2].legend(ncol=2, fontsize=8))
     save(fig, "fig2_memory_scaling")
 
 
@@ -223,8 +247,7 @@ def fig3_annealing(d: dict) -> None:
     # Headroom above the flat recall=1.0 curves so the legend has clean space:
     # at "lower right" it covered the mean-pooling curve entirely.
     ax[0].set_ylim(-0.05, 1.52)
-    ax[0].legend(loc="upper center", ncol=2, fontsize=7.5, framealpha=1.0,
-                 facecolor="white", edgecolor="0.8").set_zorder(20)
+    style_legend(ax[0].legend(loc="upper center", ncol=2, fontsize=7.5))
 
     vals = [0.00, 1.00, B[("softmax_attn", 0.10)]["recall_long"]]
     ax[1].bar([0, 1, 2], vals, width=0.6,
@@ -264,16 +287,19 @@ def fig4_distributed(d: dict) -> None:
     ax[0].set_title("Detection under fragmentation")
     # Same fix as Fig. 3: "lower left" hid the mean-pooling curve at y~0.14.
     ax[0].set_ylim(-0.05, 1.46)
-    ax[0].legend(loc="upper left", fontsize=7.5, framealpha=1.0,
-                 facecolor="white", edgecolor="0.8").set_zorder(20)
+    style_legend(ax[0].legend(loc="upper left", fontsize=7.5))
 
     au_mm = Cd[("multimax", ms[-1])]["auroc"]
     au_sm = Cd[("softmax_attn", ms[-1])]["auroc"]
     ax[1].axhline(0.5, color="grey", lw=0.7, ls=":")
     ax[1].annotate("", xy=(ms[-1], au_sm), xytext=(ms[-1], au_mm),
                    arrowprops=dict(arrowstyle="<->", color="#333", lw=1.1))
-    ax[1].text(ms[-1] * 0.55, (au_mm + au_sm) / 2,
-               f"AUROC gap\n{au_sm - au_mm:+.3f}", fontsize=8.5, ha="right")
+    # Offset in points from the midpoint of the double arrow, pushed left and down so
+    # the descending MultiMax trajectory passes above the text rather than through it.
+    ax[1].annotate(f"AUROC gap\n{au_sm - au_mm:+.3f}",
+                   xy=(ms[-1], (au_mm + au_sm) / 2), xytext=(-18, -24),
+                   textcoords="offset points", fontsize=8.2, ha="right", va="center",
+                   color="#333")
     ax[1].set_ylabel("AUROC")
     ax[1].set_title("Ranking quality past the boundary")
     ax[1].set_ylim(0.4, 1.05)

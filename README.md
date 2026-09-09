@@ -6,7 +6,7 @@
 ![PyTorch](https://img.shields.io/badge/pytorch-2.11%2Bcu128-ee4c2c)
 ![claims](https://img.shields.io/badge/claim%20checks-121%2F121%20passing-brightgreen)
 ![context](https://img.shields.io/badge/context-128%20→%20131%2C072-informational)
-![pages](https://img.shields.io/badge/paper-24%20pages%2C%200%20overfull-blue)
+![pages](https://img.shields.io/badge/paper-23%20pages%2C%200%20warnings-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
 Activation probes are deployed safety infrastructure, shipped inside frontier assistants
@@ -79,6 +79,42 @@ Every cell is read from [`benchmark_results.json`](benchmark_results.json) and v
 | memory & latency scaling | annealing | distributed attack |
 |---|---|---|
 | ![mem](figures/fig2_memory_scaling.png) | ![anneal](figures/fig3_annealing_recall.png) | ![dist](figures/fig4_distributed_attack.png) |
+
+---
+
+## Figure audit
+
+Every figure was audited against a single rule: no text may intersect another element,
+and nothing may be hidden behind anything else. Where a label and a line competed for the
+same space, the fix is a **coordinate change**, not a white mask; there are zero
+background patches in the figure code.
+
+| figure | defect | fix |
+|---|---|---|
+| 1 architecture | caption sat in the corridor swept by the two dotted expansion lines; `residual stream` crowded chunk 1 | caption moved into a band opened inside the container; label given its own column, feed arrow shortened |
+| 1 architecture | carried-state box met the stage row; feedback label struck by dashes | box and container floor lowered, feedback run shortened at both ends |
+| 2 real residuals (b) | legend over the layer-24/31 bars and the chance line | legend to upper right with 30% headroom; `chance` moved into the inter-group gap |
+| 3 systems scaling (a) | `OOM` text on the arms of the X marker | lifted 14 pt via `xytext` offset |
+| 4 annealing (a) | legend hid the mean-pooling curve entirely | ceiling raised, legend above the flat recall curves |
+| 5 drift (b) | legend crossed both trajectories | moved to the empty upper-left, `ylim` extended |
+| 5 drift (c) | Brier note lay across the curve's first leg | moved to upper left; drift label given a short leader instead of a mask |
+| 6 ablation (b) | darkest CV cell rendered **black on black**, value invisible | text colour chosen by cell luminance |
+| 6 ablation (c) | `0.000` labels detached and colliding | short labels lifted above the bar pair, 52% headroom, legend above |
+| 8 Pareto (a, c) | legends straddling the chance line and the layer-16 trajectory | (a) lower left below all points; (c) band opened above both curves |
+| 9 fragmentation (b) | `AUROC gap` callout on the data line | offset in points, left and down |
+| 10 mixed (b, c) | 5-entry legend covering curves; (c) legend on the MultiMax curve | shared legend into the empty middle band of (b); (c) band opened above both curves |
+| 11 cascade | `yes`/`no` cut by the destination box outlines | connector gap widened, labels re-anchored into that gap |
+
+Global: `axes.axisbelow=True` so grid lines sit strictly behind data; one legend style
+everywhere (white, 90% opaque, `#cccccc` rounded frame); `bbox_inches='tight'` with
+`pad_inches=0.05`, since the gap to the text block is supplied by the LaTeX float
+spacing and baking it into the image as well double-counts it.
+
+One deliberate exception: `tight_layout()` is **not** called on the two schematics or on
+`fig1_architecture`. Those have their axes switched off and size every box by measuring
+rendered text and converting to data units; `tight_layout` rescales the axes after that
+measurement, so every label overflows its box. `bbox_inches='tight'` crops without
+touching the axes, which is what they need.
 
 ---
 
