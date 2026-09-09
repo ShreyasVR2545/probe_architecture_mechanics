@@ -148,7 +148,7 @@ def fig_arch_multimax() -> None:
                                 r"$\Theta(\min(C,N))$, independent of $N$ once $C<N$",
             ha="center", va="center", fontsize=10.5, weight="bold")
 
-    py0, py1 = 2.10, 6.28
+    py0, py1 = 2.10, 6.34
     ax.plot([cxs[0], PX0], [6.80, py1], color=GREY, lw=0.8, ls=":", clip_on=False)
     ax.plot([cxs[0] + cw, PX0 + PW], [6.80, py1], color=GREY, lw=0.8, ls=":",
             clip_on=False)
@@ -156,9 +156,13 @@ def fig_arch_multimax() -> None:
                                 boxstyle="round,pad=0.01,rounding_size=0.03",
                                 facecolor="white", edgecolor=GREY, linewidth=1.0,
                                 linestyle="--", zorder=0, clip_on=False))
-    ax.text(PX0 + 0.22, py1 - 0.26,
+    # Top padding of 0.40 rather than 0.26, and an opaque background patch behind the
+    # text: previously the caption sat on the dashed container border and the two dotted
+    # expansion lines ran straight through the words.
+    ax.text(PX0 + 0.30, py1 - 0.40,
             "per-chunk work (repeats; allocates nothing that persists)",
-            fontsize=8.0, color=GREY, style="italic", ha="left", va="center")
+            fontsize=8.0, color=GREY, style="italic", ha="left", va="center", zorder=4,
+            bbox=dict(boxstyle="round,pad=0.22", facecolor="white", edgecolor="none"))
 
     for i in range(3):
         c.arrow((xs[i] + bw, row_y + hb / 2), (xs[i + 1], row_y + hb / 2))
@@ -181,8 +185,11 @@ def fig_arch_multimax() -> None:
     c.arrow((x_ret, y_fb), (x_ret, row_y), color=GREEN, lw=1.3, ls=(0, (4, 2)))
     # Label sits BELOW the feedback line: placed above, it was struck through by the
     # horizontal dashes and ran into the vertical drop segment.
-    ax.text((x_ret + sx + 0.55) / 2, y_fb - 0.14, "next chunk reuses the same buffer",
-            fontsize=7.8, color=GREEN, ha="center", va="top", style="italic")
+    # Opaque backing so the dashed feedback line does not run through the words, and so
+    # the label does not collide with the maths in the boxes above it.
+    ax.text((x_ret + sx + 0.55) / 2, y_fb - 0.16, "next chunk reuses the same buffer",
+            fontsize=7.8, color=GREEN, ha="center", va="top", style="italic", zorder=5,
+            bbox=dict(boxstyle="round,pad=0.20", facecolor="white", edgecolor="none"))
 
     # ==== the two training-time mechanisms ====
     # Two lines each. The explanatory third line these boxes used to carry now lives in
@@ -211,12 +218,16 @@ def fig_cascade_pipeline() -> None:
     ax = c.ax
     PX0 = 0.40
 
+    # The gate is stated as a RANK band, not as |p - 1/2| < delta. Sections 6.3 measures
+    # the probability-band version escalating exactly nothing at every budget up to 25%,
+    # so a diagram showing it would now contradict the text.
     stages = [
         "request\n" r"$N$ up to $131{,}072$",
         "Stage 1: MultiMax probe\n" r"$\Theta(\min(C,N))$ memory" "\n"
         "one streaming pass",
-        "Platt calibration\n" r"$\hat p=\sigma(az+b)$" "\n" "recalibrated per length",
-        "uncertainty gate\n" r"$|\hat p-\frac{1}{2}|<\delta$ ?",
+        "calibration\n" r"$\hat p$ for the reported score" "\n"
+        "(Platt or isotonic)",
+        "rank gate\n" r"middle $\delta$-band of $\mathrm{rank}(z)$ ?",
     ]
     cols = [(PALE["grey"], GREY), (PALE["blue"], BLUE),
             (PALE["yellow"], ORANGE), (PALE["yellow"], ORANGE)]
@@ -232,20 +243,26 @@ def fig_cascade_pipeline() -> None:
     rw = max(c.fit_w(t_ok, 8.2), c.fit_w(t_esc, 8.2, "bold"))
     rx = gate_r + 0.55
 
+    # Branch labels sit at the MIDPOINT of each connector with an opaque backing. Placed
+    # at rx - 0.30 they straddled the left edge of the destination boxes and were cut by
+    # the box outline.
     hok = c.fit_h(t_ok, 8.2)
-    ok_y = row_y + h + 0.26
+    ok_y = row_y + h + 0.34
     c.box(rx, ok_y, rw, t_ok, PALE["green"], GREEN, fs=8.2, h=hok)
     c.arrow((gate_r, mid + h * 0.20), (rx, ok_y + hok / 2), color=GREEN, lw=1.4, rad=0.18)
-    ax.text(rx - 0.30, ok_y + hok * 0.80, "no", fontsize=8.2, color=GREEN,
-            weight="bold", ha="center")
+    ax.text((gate_r + rx) / 2, (mid + h * 0.20 + ok_y + hok / 2) / 2 + 0.22, "no",
+            fontsize=8.2, color=GREEN, weight="bold", ha="center", va="center", zorder=6,
+            bbox=dict(boxstyle="round,pad=0.16", facecolor="white", edgecolor="none"))
 
     hesc = c.fit_h(t_esc, 8.2, "bold")
-    esc_y = row_y - hesc - 0.30
+    esc_y = row_y - hesc - 0.38
     c.box(rx, esc_y, rw, t_esc, PALE["orange"], ORANGE, fs=8.2, weight="bold", h=hesc)
     c.arrow((gate_r, mid - h * 0.20), (rx, esc_y + hesc / 2), color=ORANGE, lw=1.4,
             rad=-0.18)
-    ax.text(rx - 0.30, esc_y + hesc * 0.82, "yes", fontsize=8.2, color=ORANGE,
-            weight="bold", ha="center")
+    ax.text((gate_r + rx) / 2, (mid - h * 0.20 + esc_y + hesc / 2) / 2 - 0.22, "yes",
+            fontsize=8.2, color=ORANGE, weight="bold", ha="center", va="center",
+            zorder=6,
+            bbox=dict(boxstyle="round,pad=0.16", facecolor="white", edgecolor="none"))
 
     total_w = rx + rw - PX0
     ax.text(PX0 + total_w / 2, 6.52,
@@ -253,11 +270,13 @@ def fig_cascade_pipeline() -> None:
             "heavyweight monitor",
             ha="center", va="center", fontsize=10.5, weight="bold")
     ax.text(PX0 + total_w / 2, 0.62,
-            r"$\delta$ is the target-rate quantile of $|\hat p-\frac{1}{2}|$, so the "
-            "escalation budget is set by the operator, not by a hard-coded constant."
+            r"Gating a $\delta$-band of RANKS escalates exactly $\delta$ of traffic. "
+            r"A band on $|\hat p-\frac{1}{2}|$ does not:"
+            "\ncalibration compresses the score spread while preserving its order, and "
+            "that gate escalates nothing below a 25% budget."
             "\nStage 2 runs on the escalated fraction only, so the compute saved is "
-            r"$(1-\mathrm{escalation\ rate})$ of the stage-2 cost.",
-            ha="center", va="center", fontsize=8.2, color=GREY, linespacing=1.6)
+            r"$(1-\delta)$ of the stage-2 cost.",
+            ha="center", va="center", fontsize=8.0, color=GREY, linespacing=1.6)
 
     c.save("fig_cascade_pipeline")
 

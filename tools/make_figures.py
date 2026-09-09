@@ -1,5 +1,5 @@
 r"""
-make_figures.py — publication figures, all driven from benchmark_results.json.
+make_figures.py: publication figures, all driven from benchmark_results.json.
 
 Nothing here is hand-typed: every number is read from the artifact, so a figure cannot
 drift from the data the way the prose did. Outputs vector PDF (for LaTeX) plus PNG (for
@@ -31,6 +31,8 @@ plt.rcParams.update({
     "axes.labelsize": 10, "legend.fontsize": 9, "figure.dpi": 150,
     "axes.grid": True, "grid.alpha": 0.25, "grid.linewidth": 0.5,
     "axes.spines.top": False, "axes.spines.right": False,
+    # grid behind data: at equal zorder it cuts across markers and labels
+    "axes.axisbelow": True,
     # fonttype 3, not 42. Type-42 output makes matplotlib subset fonts via fontTools,
     # whose compiled bezierTools DLL is blocked by an Application Control policy on this
     # host ("ImportError: DLL load failed"). Type 3 needs no subsetting and renders
@@ -83,7 +85,7 @@ def fig1_architecture() -> None:
                                      mutation_scale=16, lw=lw, color=color,
                                      shrinkA=3, shrinkB=3, zorder=2))
 
-    # ---------------- input strip --------------------------------------------------
+    # ==== input strip ====
     txt(50, 97.0,
         r"Frozen LLM $\rightarrow$ residual stream at layer $\ell$:   "
         r"$x_{i,j}\in\mathbb{R}^{d}$,   $j = 1 \dots N$,   $N$ up to $131{,}072$",
@@ -101,7 +103,7 @@ def fig1_architecture() -> None:
     arrow(27, 86.8, 27, 79.6)
     arrow(73, 86.8, 73, 79.6)
 
-    # ---------------- left card: softmax, full materialisation ---------------------
+    # ==== left card: softmax, full materialisation ====
     card(3, 50, 45, 28.5, "#FDF2EA", C["softmax_attn"])
     txt(25.5, 75.2, "Softmax attention pooling", FSB, weight="bold",
         color=C["softmax_attn"])
@@ -115,7 +117,7 @@ def fig1_architecture() -> None:
         color=C["softmax_attn"])
     txt(25.5, 52.6, r"scaling exponent  $\alpha = 0.842$", FSS, color="#555")
 
-    # ---------------- right card: multimax, streaming ------------------------------
+    # ==== right card: multimax, streaming ====
     card(52, 50, 45, 28.5, "#EAF2F9", C["multimax"])
     txt(74.5, 75.2, "MultiMax aggregation (ours)", FSB, weight="bold",
         color=C["multimax"])
@@ -136,7 +138,7 @@ def fig1_architecture() -> None:
     arrow(48.6, 64.0, 51.4, 64.0, color="#777", lw=1.4, style="<|-|>")
     txt(50, 67.4, r"$34\times$", FS, color="#555", weight="bold")
 
-    # ---------------- gate ----------------------------------------------------------
+    # ==== gate ====
     arrow(74.5, 49.6, 74.5, 40.8)
     card(46, 28.0, 51, 12.0, "#F4F4F4", "#555", lw=1.4)
     txt(71.5, 36.8, "Platt-scaled cascading gate", FSB, weight="bold")
@@ -218,8 +220,11 @@ def fig3_annealing(d: dict) -> None:
     ax[0].set_xlabel("attack strength $S$ (per coordinate)")
     ax[0].set_ylabel("recall @ 1% FPR,  $N{=}16{,}384$")
     ax[0].set_title("Weak-signal recall")
-    ax[0].set_ylim(-0.05, 1.10)
-    ax[0].legend(loc="lower right")
+    # Headroom above the flat recall=1.0 curves so the legend has clean space:
+    # at "lower right" it covered the mean-pooling curve entirely.
+    ax[0].set_ylim(-0.05, 1.52)
+    ax[0].legend(loc="upper center", ncol=2, fontsize=7.5, framealpha=1.0,
+                 facecolor="white", edgecolor="0.8").set_zorder(20)
 
     vals = [0.00, 1.00, B[("softmax_attn", 0.10)]["recall_long"]]
     ax[1].bar([0, 1, 2], vals, width=0.6,
@@ -257,8 +262,10 @@ def fig4_distributed(d: dict) -> None:
                color="#C0392B")
     ax[0].set_ylabel("recall @ 1% FPR")
     ax[0].set_title("Detection under fragmentation")
-    ax[0].set_ylim(-0.05, 1.10)
-    ax[0].legend(loc="lower left")
+    # Same fix as Fig. 3: "lower left" hid the mean-pooling curve at y~0.14.
+    ax[0].set_ylim(-0.05, 1.46)
+    ax[0].legend(loc="upper left", fontsize=7.5, framealpha=1.0,
+                 facecolor="white", edgecolor="0.8").set_zorder(20)
 
     au_mm = Cd[("multimax", ms[-1])]["auroc"]
     au_sm = Cd[("softmax_attn", ms[-1])]["auroc"]

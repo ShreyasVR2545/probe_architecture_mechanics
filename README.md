@@ -6,6 +6,7 @@
 ![PyTorch](https://img.shields.io/badge/pytorch-2.11%2Bcu128-ee4c2c)
 ![claims](https://img.shields.io/badge/claim%20checks-121%2F121%20passing-brightgreen)
 ![context](https://img.shields.io/badge/context-128%20→%20131%2C072-informational)
+![pages](https://img.shields.io/badge/paper-24%20pages%2C%200%20overfull-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
 Activation probes are deployed safety infrastructure, shipped inside frontier assistants
@@ -30,7 +31,7 @@ transform fixed, and measures four reductions across $N \in [128,\;131{,}072]$.
 | **Real residual streams** | On Mistral-7B-v0.1 (layers 16/24/31) the memory law holds unchanged: overhead flat at **8.0 MiB** from $N{=}4096$ to $131{,}072$ vs **641.0 MiB** for softmax pooling. Detection transfers but shrinks: mean AUROC **0.731** vs 0.690 / 0.696 under a needle-disjoint split, and MultiMax **collapses to chance at layer 31** (0.535). |
 | **A leak we closed** | Our first split shared needle sentences between train and test, inflating MultiMax by **+0.106** AUROC. All reported real-model numbers use the needle-disjoint split. |
 | **Cascade, real stage 2, n=532** | Stage 2 is **SGuard-ContentFilter-2B**, run for real on 532 held-out prompts from real corpora (AdvBench-derived + Alpaca, prompt-disjoint). Stage 1 costs **0.104%** of its FLOPs (0.367 ms vs 1602.9 ms). At a 25% escalation budget the cascade reaches ASR **0.053** against **0.496** for running SGuard on everything: **9× fewer successful attacks at a quarter of the compute**. |
-| **The gate had to be redesigned** | Gating on a calibrated probability is **inert**: Platt escalates *nothing* at any budget ≤25%, isotonic reaches 0.008, temperature saturates at 0.056. Calibration compresses the score *spread* while preserving its *order*. Gating on **rank** cuts the escalation tracking error from **0.086 → 0.0008**. |
+| **The gate had to be redesigned** | Gating on a calibrated probability is **inert**: Platt escalates *nothing* at any budget ≤25%, isotonic reaches 0.008, temperature saturates at 0.056. Calibration compresses the score *spread* while preserving its *order*. Gating on **rank** cuts the escalation tracking error from **0.086 → 0.0008**, and is what the cascade schematic now shows. |
 | **Second model family** | On **Qwen2.5-7B** the averaged ordering does *not* hold (MultiMax 0.817 vs softmax 0.833), but the length trend does: softmax falls **0.947 → 0.661** from N=256 to 4096 while the peaked reductions stay near flat. The advantage is a long-context one, not a uniform one. **Top-r wins overall (0.859)**. |
 | **Pareto: depth decides r** | Raising top-*r* from 1 to 32 costs **0.009** AUROC at an intermediate layer and buys **0.200** near the final one. The cheap corner (m=32, r=2, 0.50 MiB) matches the best configuration (m=128, r=1, 2.00 MiB) to within 0.001. |
 | **Bandwidth, not FLOPs** | All three $\Theta(N)$-time aggregators issue the same $\Theta(Nmd)$ multiply-accumulates. Latency differs by only **1.4×** while memory differs by **34×**, the signature of a bandwidth-bound regime. At $N{=}131{,}072$, $m{=}512$ in bf16 one softmax intermediate is **128 MiB** exactly, so a write-then-read costs 256 MiB of avoidable traffic. |
@@ -156,9 +157,11 @@ python suite_d_chunk_ablation.py     # answers "is O(1) just chunking?" -> Theta
 python tools/check_claims.py         # 121/121 prose-vs-artifact checks (incl. paper.tex)
 python tools/check_tex.py            # structure, numbering, dangling refs + citations
 python tools/audit_bib.py            # every arXiv id re-resolved against the arXiv API
-python tools/make_figures.py         # figures/*.pdf and *.png
+# figures: all three scripts, then the paper. Every figure is redrawn from
+# artifacts/, so a stale plot cannot survive a rebuild.
+python tools/make_figures.py         # fig1..fig4 from benchmark_results.json
 python tools/make_diagrams.py        # architecture + cascade schematics
-python tools/make_result_figures.py  # the four reviewer-response figures
+python tools/make_result_figures.py  # the six empirical figures
 
 # reviewer-response experiments (run in this order; each writes artifacts/exp*.json)
 python experiments/exp1_real_residuals.py --max-n 4096   # real Mistral-7B residuals
@@ -171,7 +174,10 @@ python experiments/exp6_pareto.py                        # AUROC-vs-memory Paret
 python experiments/exp7_cascade_scaled.py                # cascade at n=532, four gating rules
 python experiments/exp8_qwen_family.py --max-n 4096      # second model family (Qwen2.5-7B)
 
-# paper  (latexmk needs Perl; this sequence does not)
+# everything at once (figures + paper + all three gates)
+./build.sh
+
+# or the paper alone (latexmk needs Perl; this sequence does not)
 pdflatex -interaction=nonstopmode paper.tex
 bibtex paper
 pdflatex -interaction=nonstopmode paper.tex

@@ -36,8 +36,36 @@ plt.rcParams.update({
     "axes.labelsize": 9, "legend.fontsize": 8, "figure.dpi": 150,
     "axes.grid": True, "grid.alpha": 0.25, "grid.linewidth": 0.5,
     "axes.spines.top": False, "axes.spines.right": False,
+    # Grid strictly behind data and annotations. Without this matplotlib draws grid lines
+    # at the same zorder as some artists and they cut across markers and text.
+    "axes.axisbelow": True,
     "pdf.fonttype": 3, "ps.fonttype": 3,      # see make_figures.py for why not 42
 })
+
+# Legends are opaque and sit above everything. A translucent legend laid over a curve
+# reads as a collision even when it is technically "behind" the data, and a transparent
+# one lets grid lines strike through the labels.
+LEG = dict(frameon=True, framealpha=1.0, facecolor="white", edgecolor="0.8",
+           borderpad=0.4, handlelength=1.6, labelspacing=0.35)
+
+
+def legend(ax, **kw):
+    opts = dict(LEG)
+    opts.update(kw)
+    lg = ax.legend(**opts)
+    if lg is not None:
+        lg.set_zorder(20)
+    return lg
+
+
+def text_on(color) -> str:
+    """Black or white, whichever is readable on `color`.
+
+    Needed because the CV heatmap uses a dark colormap: hard-coding black text made the
+    darkest cell (c=10, H=32) render black-on-black and its value was invisible.
+    """
+    r, g, b = matplotlib.colors.to_rgb(color)
+    return "white" if (0.299 * r + 0.587 * g + 0.114 * b) < 0.55 else "black"
 
 C = {"multimax": "#0072B2", "softmax_attn": "#D55E00", "mean_pool": "#009E73",
      "topr": "#CC79A7", "mean_max": "#8E6C00"}
@@ -81,7 +109,7 @@ def fig_real_llm():
     ax.set_xlabel(r"context length $N$")
     ax.set_ylabel("activation overhead (MiB)")
     ax.set_title(r"(a) memory at Mistral-7B width $d{=}4096$")
-    ax.legend(frameon=False, loc="upper left")
+    legend(ax, loc="upper left")
 
     ax = axes[1]
     det = d["detection"]
@@ -99,13 +127,16 @@ def fig_real_llm():
             vals.append(float(np.mean(rs)) if rs else np.nan)
         ax.bar(x + i * w - 0.4 + w / 2, vals, w * 0.92, color=C[kind], label=LBL[kind])
     ax.axhline(0.5, color="0.35", lw=0.9, ls="--")
-    ax.text(len(layers) - 0.5, 0.512, "chance", fontsize=7.5, color="0.35", ha="right")
+    # 'chance' on the LEFT: at the right edge it sat under the legend and was unreadable.
+    ax.text(-0.30, 0.515, "chance", fontsize=7.5, color="0.35", ha="left", va="bottom")
     ax.set_xticks(x)
     ax.set_xticklabels([f"layer {L}" for L in layers])
     ax.set_ylabel("AUROC (mean over $N$)")
-    ax.set_ylim(0.35, 1.02)
+    # Headroom above the tallest bar (0.86) so the legend clears the data entirely; at
+    # 'lower right' it cut through the layer-24 and layer-31 bars and the chance line.
+    ax.set_ylim(0.35, 1.28)
     ax.set_title("(b) detection on real residuals")
-    ax.legend(frameon=False, loc="lower right", ncol=1)
+    legend(ax, loc="upper center", ncol=3, fontsize=6.6, columnspacing=1.0)
     fig.tight_layout()
     save(fig, "fig_real_llm_performance")
 
@@ -145,11 +176,11 @@ def fig_ablation():
             for j in range(len(Hs)):
                 if np.isnan(M[i, j]):
                     continue
-                v = M[i, j]
-                rng = (np.nanmax(M) - np.nanmin(M)) or 1.0
-                dark = (v - np.nanmin(M)) / rng > 0.55
-                ax.text(j, i, f"{v:.2f}", ha="center", va="center", fontsize=7,
-                        color="white" if (dark and cmap == "viridis") else "black")
+                # Colour by the LUMINANCE of the cell actually drawn. The previous rule
+                # keyed off the colormap name and rendered the darkest CV cell
+                # (c=10, H=32) black-on-black, hiding its value entirely.
+                ax.text(j, i, f"{M[i, j]:.2f}", ha="center", va="center", fontsize=7,
+                        color=text_on(im.cmap(im.norm(M[i, j]))), zorder=6)
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
 
     ax = axes[2]
@@ -158,18 +189,23 @@ def fig_ablation():
     off = [next(r["grad_norm"] for r in prec if r["dtype"] == t and not r["ste"])
            for t in dts]
     x = np.arange(len(dts), dtype=float)
-    ax.bar(x - 0.19, on, 0.36, color="#0072B2", label="straight-through")
+    ax.bar(x - 0.19, on, 0.36, color="#0072B2", label="straight-through", zorder=3)
     ax.bar(x + 0.19, [max(v, 0) for v in off], 0.36, color="#D55E00",
-           label="plain clamp")
+           label="plain clamp", zorder=3)
+    # Annotate the zero bars flat on the baseline. Rotated 90 degrees and floated at 3%
+    # of the axis they read as detached labels colliding with the tick text.
     for xi, v in zip(x + 0.19, off):
         if v == 0:
-            ax.text(xi, max(on) * 0.03, "0.000", ha="center", va="bottom", fontsize=7,
-                    rotation=90, color="#D55E00")
+            ax.annotate("0.000", xy=(xi, 0), xytext=(0, 3), textcoords="offset points",
+                        ha="center", va="bottom", fontsize=6.8, color="#D55E00",
+                        zorder=6)
     ax.set_xticks(x)
     ax.set_xticklabels(dts)
     ax.set_ylabel("gradient norm under saturation")
+    # Headroom so the legend sits above the bars rather than against their tops.
+    ax.set_ylim(0, max(on) * 1.34)
     ax.set_title("(c) STE vs plain clamp")
-    ax.legend(frameon=False, fontsize=7.5)
+    legend(ax, loc="upper center", ncol=1, fontsize=7)
     fig.tight_layout()
     save(fig, "fig_ablation_grid")
 
@@ -182,6 +218,7 @@ def fig_drift_cal():
     fig, axes = plt.subplots(1, 3, figsize=(7.6, 2.8))
 
     ax = axes[0]
+    ax.set_ylim(0, 118)                 # headroom so the legend clears both curves
     for tau, mk in ((0.5, "o"), (1.0, "s")):
         rs = sorted([r for r in d["lse"] if r["tau"] == tau], key=lambda r: r["N"])
         if not rs:
@@ -196,7 +233,7 @@ def fig_drift_cal():
     ax.set_xlabel(r"context length $N$")
     ax.set_ylabel("logit offset (unnormalised $-$ normalised)")
     ax.set_title("(a) LSE normalisation")
-    ax.legend(frameon=False, fontsize=7.5)
+    legend(ax, loc="upper left", fontsize=6.8)
 
     ax = axes[1]
     pts = d["drift"]["points"]
@@ -213,22 +250,46 @@ def fig_drift_cal():
     ax.set_xlabel(r"$\sqrt{\log N}$")
     ax.set_ylabel(r"$\mathbb{E}[\max_j \varepsilon_j]$")
     ax.set_title("(b) benign-maximum drift")
-    ax.legend(frameon=False, fontsize=7.0, loc="upper left")
+    legend(ax, loc="lower right", fontsize=6.6)
 
+    # Panel (c) redesigned. As grouped bars on a linear axis it showed exactly one
+    # visible rectangle: the Brier scores are ~1e-8 (transferred) and ~1e-12 (per
+    # length), so seven of the eight bars had no height. The finding is that the logit
+    # DOES drift while Brier does NOT move, which needs two axes to show at all.
     ax = axes[2]
     rows = sorted(d["calibration"]["rows"], key=lambda r: r["N"])
     Ns = [r["N"] for r in rows]
     x = np.arange(len(Ns), dtype=float)
-    ax.bar(x - 0.2, [r["brier_transferred"] for r in rows], 0.38, color="#D55E00",
-           label=r"one map from $N{=}4096$")
-    ax.bar(x + 0.2, [r["brier_per_length"] for r in rows], 0.38, color="#0072B2",
-           label="recalibrated per length")
+    ax.plot(x, [r["mean_logit"] for r in rows], "o-", color="#0072B2", ms=4, lw=1.5,
+            zorder=4)
+    drift = max(r["mean_logit"] for r in rows) - min(r["mean_logit"] for r in rows)
+    ax.set_ylabel("mean logit", color="#0072B2")
+    ax.tick_params(axis="y", labelcolor="#0072B2")
     ax.set_xticks(x)
     ax.set_xticklabels([f"{n // 1024}k" if n >= 1024 else str(n) for n in Ns])
     ax.set_xlabel(r"evaluation length $N$")
-    ax.set_ylabel("Brier score (lower is better)")
-    ax.set_title("(c) calibration transfer")
-    ax.legend(frameon=False, fontsize=7.5)
+    ax.set_title("(c) drift moves, calibration does not")
+
+    # Only the logit is plotted. A twin log axis for Brier was tried and rejected: on a
+    # log scale 1e-13 -> 4e-8 looks like a dramatic rise, which is the opposite of the
+    # finding. The Brier numbers are stated instead, with the threshold that would
+    # actually matter, so the panel cannot be misread as showing a penalty.
+    worst = max(r["brier_transferred"] for r in rows)
+    ax.set_ylim(min(r["mean_logit"] for r in rows) - 0.25,
+                max(r["mean_logit"] for r in rows) + 0.75)
+    ax.set_ylabel("mean logit")
+    ax.tick_params(axis="y", labelcolor="black")
+    ax.annotate(rf"drift $={drift:.2f}$ logits",
+                xy=(x[-1], rows[-1]["mean_logit"]), xytext=(-8, -16),
+                textcoords="offset points", fontsize=7.0, color="#0072B2", ha="right",
+                zorder=6)
+    mant, exp = f"{worst:.1e}".split("e")          # from the artifact, never typed in
+    ax.text(0.03, 0.97,
+            rf"Brier $\leq {mant}\times10^{{{int(exp)}}}$ at every $N$" "\n"
+            r"($0.01$ would be a penalty that matters)",
+            transform=ax.transAxes, fontsize=6.6, color="0.30", va="top", ha="left",
+            zorder=6,
+            bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="0.85"))
     fig.tight_layout()
     save(fig, "fig_drift_and_calibration")
 
@@ -256,7 +317,13 @@ def fig_mixed_frag():
         ax.set_ylabel("AUROC")
         ax.set_ylim(0.35, 1.03)
         ax.set_title(title)
-    axes[0].legend(frameon=False, fontsize=7.0, loc="lower left")
+    # Five entries will not fit inside (a) without covering the mean-pooling curve and
+    # the chance line, which is where they were. Panel (b) is nearly empty between 0.4
+    # and 0.7, so the shared legend goes there and costs no extra figure height.
+    handles, labels = axes[0].get_legend_handles_labels()
+    lg = axes[1].legend(handles, labels, loc="lower center", ncol=2, fontsize=6.4,
+                        columnspacing=1.0, **LEG)
+    lg.set_zorder(20)
 
     ax = axes[2]
     bt = [r for r in d["batched"] if not r.get("oom")]
@@ -271,7 +338,10 @@ def fig_mixed_frag():
     ax.set_xlabel(r"batch size $B$ at $N{=}65{,}536$")
     ax.set_ylabel("overhead above input (MiB)")
     ax.set_title("(c) batched systems cost")
-    ax.legend(frameon=False, fontsize=7.5, loc="upper left")
+    # Upper left, above the softmax curve. 'lower right' was tried and is worse: the
+    # MultiMax curve climbs straight through that corner.
+    ax.set_ylim(5, 2e4)
+    legend(ax, loc="upper left", fontsize=7)
     fig.tight_layout()
     save(fig, "fig_mixed_fragmentation")
 
@@ -308,8 +378,10 @@ def fig_pareto_top_r():
         ax.set_ylabel("AUROC")
         depth = "intermediate" if L == min(layers) else "near-final"
         ax.set_title(f"(layer {L}, {depth})")
-        ax.set_ylim(0.42, 1.0)
-    axes[0].legend(frameon=False, fontsize=6.8, loc="lower right", ncol=2)
+        # Extra headroom at the bottom so the legend sits below every point and below
+        # the chance line, instead of straddling both as it did at 'lower right'.
+        ax.set_ylim(0.28, 1.0)
+    legend(axes[0], loc="lower left", fontsize=6.4, ncol=2, columnspacing=0.9)
 
     # the r effect, isolated: it is depth that decides whether r matters
     ax = axes[-1]
@@ -323,7 +395,7 @@ def fig_pareto_top_r():
     ax.set_xlabel(r"top-$r$")
     ax.set_ylabel(r"best AUROC over $m$")
     ax.set_title(r"(c) where $r$ earns its cost")
-    ax.legend(frameon=False, fontsize=7.5)
+    legend(ax, loc="center right", fontsize=7)
     fig.tight_layout()
     save(fig, "fig_pareto_top_r")
 
@@ -357,18 +429,28 @@ def fig_qwen_family():
     # use the same colours, so the one in (b) serves both.
 
     ax = axes[1]
+    # MultiMax and Top-r are both flat at exactly 8.0 MiB, so one curve hid the other
+    # completely. Distinct dash patterns and marker sizes make the coincidence legible
+    # as a coincidence rather than as a missing series.
+    styles = {"multimax": ("o-", 4.2, 1.6), "topr": ("s--", 3.0, 1.2),
+              "softmax_attn": ("o-", 3.5, 1.3), "mean_pool": ("o-", 3.5, 1.3)}
     for kind in probes:
         rs = sorted([r for r in sysrows if r["probe"] == kind], key=lambda r: r["N"])
         if not rs:
             continue
-        ax.plot([r["N"] for r in rs], [r["peak_overhead_mib"] for r in rs], "o-",
-                color=C.get(kind, "0.4"), label=LBL.get(kind, kind), ms=3.5, lw=1.3)
+        st, ms_, lw_ = styles.get(kind, ("o-", 3.5, 1.3))
+        ax.plot([r["N"] for r in rs], [r["peak_overhead_mib"] for r in rs], st,
+                color=C.get(kind, "0.4"), label=LBL.get(kind, kind), ms=ms_, lw=lw_)
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
+    ax.set_ylim(4, 2000)
     ax.set_xlabel(r"context length $N$")
     ax.set_ylabel("activation overhead (MiB)")
     ax.set_title(r"(b) memory at Qwen width $d{=}3584$")
-    ax.legend(frameon=False, fontsize=7, loc="upper left")
+    ax.annotate(r"MultiMax and Top-$r$ coincide at $8.0$ MiB",
+                xy=(rs[-1]["N"], 8.0), xytext=(0, -16), textcoords="offset points",
+                fontsize=6.2, color="0.35", ha="right")
+    legend(ax, loc="upper left", fontsize=6.8)
     fig.tight_layout()
     save(fig, "fig_qwen_family")
 

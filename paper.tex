@@ -70,7 +70,34 @@
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\sg}{\operatorname{sg}}
-\captionsetup{font=small,labelfont=bf}
+\captionsetup{font=small,labelfont=bf,skip=4pt}
+
+% ==== Float and bibliography spacing ================================================
+% Tightened to land the document on 24 pages. Before this the references spilled two
+% orphan lines onto a 25th page, which wastes a page to carry almost nothing. These
+% touch only the space AROUND floats and between bibliography items; \textwidth,
+% \textheight and the margins are untouched, so the page geometry a venue checks is
+% exactly as it was.
+\setlength{\textfloatsep}{8pt plus 2pt minus 2pt}
+\setlength{\intextsep}{6pt plus 2pt minus 2pt}
+\setlength{\floatsep}{7pt plus 2pt minus 2pt}
+\setlength{\abovecaptionskip}{4pt}
+\setlength{\belowcaptionskip}{2pt}
+
+% natbib's plainnat bibliography inherits list spacing from the article class, which is
+% generous. Zeroing the inter-item glue recovers roughly a third of a page over 25
+% references without touching the entries themselves.
+\makeatletter
+\renewcommand{\@biblabel}[1]{[#1]\hfill}
+\let\oldthebibliography\thebibliography
+\renewcommand{\thebibliography}[1]{%
+  \oldthebibliography{#1}%
+  \setlength{\itemsep}{0pt}%
+  \setlength{\parsep}{0pt}%
+  \setlength{\topsep}{4pt}%
+  \setlength{\labelsep}{4pt}%
+}
+\makeatother
 
 \title{\textbf{Silence of the RAM:}\\[3pt]
 \Large Constant-Memory Safety Probing and the Frontiers of Streaming Guardrails}
@@ -623,6 +650,14 @@ Targets of $1/2/5/10\%$ land at $1.2/2.5/5.0/10.0\%$. Total system cost is
 \end{equation}
 so with $c_{\mathrm p}\!\ll\!c_{\mathrm L}$ the saving is governed almost entirely by the
 escalation rate.
+
+We flag one thing here that \S\ref{sec:cascadeeval} later overturns. Defining the band on
+$|\hat p-\tfrac12|$ makes the gate depend on the \emph{spread} of the calibrated
+probability, and calibration is free to compress that spread while leaving the score
+ordering intact. Measured on $532$ prompts, this band escalates nothing at any budget up
+to $25\%$, for all three calibrators we tried. The band should be taken on the
+\emph{rank} of $z$ instead; we keep the derivation above because the cost model
+\eqref{eq:cost} is unaffected, only the definition of $u(\delta)$ changes.
 
 % =====================================================================================
 \section{Real-Model and Systems Experiments}
