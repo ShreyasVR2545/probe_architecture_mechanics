@@ -98,8 +98,10 @@ memory-bound: an attention-pooled probe materialises a score tensor over the who
 sequence, so its footprint grows with the one quantity an adversary controls, the context
 length. We study aggregation as the independent variable, holding the token transform
 fixed, and characterise a hard-maximum probe (\emph{MultiMax}) against softmax attention
-pooling, mean pooling and full self-attention across $N \in [128,\,131{,}072]$.
-Three results follow.
+pooling, mean pooling and full self-attention across $N \in [128,\,131{,}072]$. Claims are
+established both analytically and empirically on \emph{real} residual streams read out of
+an open-weight model (Mistral-7B-v0.1, layers 16, 24 and 31), not on synthetic activations
+alone. Three results follow.
 
 \vspace{0.5em}
 \noindent
@@ -108,7 +110,10 @@ per-head state, giving activation overhead of $\Theta(\min(C,N))$ in the chunk w
 measured at a flat $19.1$\,MiB from $N{=}8{,}192$ to $131{,}072$ ($\alpha{=}0.000$)
 against $652.1$\,MiB for softmax pooling ($\alpha{=}0.842$), while self-attention reaches
 $10.1$\,GiB and exhausts memory. A chunk ablation confirms the constant is chosen, not
-free.
+free. On real Mistral-7B activations at $d{=}4096$ the same law holds: overhead is flat at
+$8.0$\,MiB from $N{=}4096$ to $131{,}072$ against $641.0$\,MiB for softmax pooling. Under a
+needle-disjoint split MultiMax also leads detection, but only narrowly (mean AUROC $0.731$
+against $0.690$ and $0.696$), and it collapses to chance at the final layer.
 
 \vspace{0.5em}
 \noindent
@@ -164,9 +169,20 @@ contributions:
   \item \textbf{An honest boundary.} We construct the adversary that specifically attacks
   a maximum, locate the failure at $m{=}64$, and report that softmax pooling degrades more
   gracefully past it. This bounds our own claim (\S\ref{sec:distributed}).
-  \item \textbf{A calibrated cascade.} Sum-of-maxima logits are upward-biased; we show
-  temperature scaling is structurally insufficient and that budget-driven thresholding is
-  the correct interface (\S\ref{sec:cascade}).
+  \item \textbf{A calibrated cascade with a real second stage.} Sum-of-maxima logits are
+  upward-biased; we show temperature scaling is structurally insufficient and that
+  budget-driven thresholding is the correct interface (\S\ref{sec:cascade}), then
+  instantiate stage 2 with a deployed guardrail model rather than a stand-in
+  (\S\ref{sec:cascadeeval}).
+  \item \textbf{Validation on real residual streams.} Every detection claim is repeated on
+  activations read out of Mistral-7B-v0.1 at layers 16, 24 and 31. The memory law and the
+  aggregator ordering both survive; the hard maximum additionally collapses at the final
+  layer, which is a limit the synthetic setting could not have exposed
+  (\S\ref{sec:realllm}).
+  \item \textbf{Hyperparameters chosen rather than asserted.} A $c\times H$ grid shows the
+  usable region is a staircase, and a direct measurement of pre-clamp logits identifies
+  saturation of both classes, not saturation as such, as the failure mode
+  (\S\ref{sec:ablation}).
 \end{itemize}
 
 All numbers below are read programmatically from a single benchmark artifact; a claims
@@ -174,6 +190,7 @@ checker verifies every figure quoted in this paper against it.
 
 % =====================================================================================
 \section{Aggregation as the Independent Variable}
+\label{sec:agg}
 % =====================================================================================
 Let $x_{i,j}\in\R^{d}$ be the residual-stream activation at layer $\ell$ and position
 $j\in\{1,\dots,N\}$. A probe is
@@ -451,7 +468,73 @@ signature rather than an effect, since no dilution mechanism improves with a wea
 \end{remark}
 
 % =====================================================================================
-\section{Calibration and the Cascading Gate}
+\section{Methodology}
+\label{sec:method}
+% =====================================================================================
+Sections \ref{sec:agg}--\ref{sec:annealing} fix the forward map and its training
+dynamics. This section states the remaining choices explicitly, so that every constant
+used in Sections \ref{sec:empirical} and \ref{sec:adversarial} is either derived here or
+selected by the ablation of \S\ref{sec:ablation} rather than asserted.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_arch_multimax.pdf}
+\caption{The streaming MultiMax pipeline. Chunks of $C$ tokens enter one at a time; the
+token transform $\phi$ and the head projection are applied within a chunk and discarded,
+and the only quantity that crosses a chunk boundary is the $(B,H)$ buffer of running
+maxima. Its size is set by $H$, not by $N$, which is the whole of the memory claim. The
+two boxes at the foot are training-time mechanisms that leave the deployed map unchanged:
+the $1/N$ inside the Boltzmann operator of \eqref{eq:boltzmann} removes an $H\tau\log N$
+length-dependent offset that plain LogSumExp would introduce
+(Remark~\ref{rem:normalisation}), and the
+straight-through clamp keeps gradients alive in the saturated regime where a plain clamp
+returns exactly zero (Remark~\ref{rem:clamp}).}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Token transform, head projection, and hyperparameters}
+\label{sec:hyper}
+
+The token transform of \eqref{eq:probe} is a single hidden layer,
+\begin{equation}
+  \phi(x_j)=\mathrm{GELU}(W_1x_j+b_1)\in\R^{m},
+  \qquad W_1\in\R^{m\times d},
+  \label{eq:phi}
+\end{equation}
+followed by the head projection $s_{j,h}=v_h^\top\phi(x_j)$ with $V=[v_1,\dots,v_H]\in
+\R^{m\times H}$ carrying no bias, since a per-head bias is absorbed by the scalar $b$ in
+\eqref{eq:multimax}. Every aggregator in this paper shares this $\phi$ and differs only in
+the reduction, which is what makes the comparison a comparison of reductions.
+
+We use $m=512$, $H=8$, $c=10$ and $C=4096$ throughout. These are not free: $c$ and $H$ are
+selected by the grid of \S\ref{sec:ablation}, which shows a usable window rather than a
+monotone preference, and $C$ trades memory against occupancy along the measured law
+$\Theta(\min(C,N))$ of Remark~\ref{rem:complexity}. Compute runs in bf16 with the
+reduction accumulated in fp32; \S\ref{sec:precision} shows the choice of compute
+precision does not change the gradient conclusion.
+
+\subsection{Annealing schedule}
+\label{sec:schedule}
+
+Training replaces the hard maximum by the normalised Boltzmann operator of
+\eqref{eq:boltzmann} under a fixed schedule. Writing $t$ for the epoch index and $T$ for the
+total number of epochs,
+\begin{equation}
+  \tau(t)=
+  \begin{cases}
+    \tau_0\left(1-\dfrac{t}{\rho T}\right), & t<\rho T,\\[6pt]
+    0, & t\ge \rho T,
+  \end{cases}
+  \qquad \tau_0=1,\quad \rho=0.6 .
+  \label{eq:schedule}
+\end{equation}
+The schedule is linear rather than exponential and it reaches exactly zero before
+training ends. Both details matter. A schedule that only approaches zero leaves a
+train-to-deploy mismatch, because deployment uses the exact maximum; annealing to zero
+with $40\%$ of the epochs remaining lets the probe adapt to the operator it will actually
+be evaluated under. The deployed model is therefore $\tau=0$ in every number we report.
+
+\subsection{Calibration and the cascading gate}
 \label{sec:cascade}
 % =====================================================================================
 The gate escalates iff $|\hat p-\tfrac12|<\delta$. This is a statement about $\hat p$, so
@@ -488,24 +571,155 @@ so with $c_{\mathrm p}\!\ll\!c_{\mathrm L}$ the saving is governed almost entire
 escalation rate.
 
 % =====================================================================================
-\section{Empirical Evaluation}
+\section{Real-Model and Systems Experiments}
+\label{sec:empirical}
 % =====================================================================================
-\paragraph{Setup.} Synthetic residual streams, $d{=}2048$, batch $1$, bf16 compute with
-fp32 reduction, chunk $C{=}4096$, on a single 7.96\,GiB consumer GPU. The attack is a
-fixed direction scaled to unit magnitude per coordinate against background $\sigma{=}0.5$.
-Probes train only at $N{=}512$; long context is strictly out of distribution. Recall is
-read at a threshold giving $1\%$ FPR on benign sequences \emph{of the same length}, so no
-length-dependent score shift contaminates the comparison.
+\paragraph{Setup.} Two families of experiment. \S\ref{sec:realllm} reads \emph{real}
+residual streams out of an open-weight model. The remainder use synthetic residual
+streams, $d{=}2048$, batch $1$, bf16 compute with fp32 reduction, chunk $C{=}4096$, on a
+single 7.96\,GiB consumer GPU; the attack is a fixed direction scaled to unit magnitude
+per coordinate against background $\sigma{=}0.5$. Probes train only at $N{=}512$, so long
+context is strictly out of distribution. Recall is read at a threshold giving $1\%$ FPR on
+benign sequences \emph{of the same length}, so no length-dependent score shift
+contaminates the comparison.
+
+\subsection{Real open-weight residual streams}
+\label{sec:realllm}
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig1_architecture.pdf}
-\caption{Aggregation as the independent variable, and the cascade it enables. Softmax
-pooling materialises a score tensor over the sequence; MultiMax streams a per-head maximum
-and carries only $(B,H)$ state. The Platt-scaled gate routes confident traffic to the
-probe verdict and escalates only the ambiguous band.}
-\label{fig:arch}
+\includegraphics[width=\textwidth]{figures/fig_real_llm_performance.pdf}
+\caption{Mistral-7B-v0.1 residual streams. (a) Activation overhead at the model's true
+width $d{=}4096$: MultiMax is flat at $8.0$\,MiB from $N{=}4096$ to $131{,}072$, a
+$32\times$ increase in length at zero increase in footprint, while softmax pooling rises
+from $28.0$ to $641.0$\,MiB. (b) Detection AUROC by layer, averaged over
+$N\in\{256,1024,4096\}$. The hard maximum is the better reduction at layers 16 and 24 and
+loses its advantage at layer 31.}
+\label{fig:realllm}
 \end{figure}
+
+\paragraph{Protocol.} We extract residual streams from Mistral-7B-v0.1 at layers 16, 24
+and 31 of 32, for sequences of $N\in\{256,1024,4096\}$ tokens. Positives embed a short
+harmful-intent request at a uniformly random position in benign filler; negatives embed a
+topically matched benign request of similar length in the same filler, so intent rather
+than length or topic is the discriminating variable. Length matching is not a detail: an
+earlier synthetic protocol that did not match it scored AUROC $0.685$ on needle length
+alone. Probes are trained on half the sequences and scored on the held-out half.
+
+\paragraph{Two constraints we did not choose.} Llama-3-8B-Instruct was the intended model
+and every \texttt{meta-llama} repository returns HTTP 403 for our account, so we use
+Mistral-7B-v0.1, which is ungated and has exactly 32 layers. More importantly,
+Mistral-7B-v0.1 has a $32{,}768$-token position range, so $N=2^{17}$ is not a length at
+which real residuals for this model \emph{exist}. Real-residual detection therefore stops
+at $N=4096$ and the ladder to $131{,}072$ in
+Fig.~\ref{fig:realllm}(a) and \S\ref{sec:systems} uses tensors at the model's true width.
+That split is deliberate: a probe's memory profile is a function of $(d,N,C)$ and the
+reduction, and does not depend on whether the numbers came from a forward pass, whereas
+detection obviously does. We do not report detection at lengths where we cannot measure
+it.
+
+\begin{table}[t]
+\centering\small
+\begin{tabular}{rrccc}
+\toprule
+$N$ & layer & MultiMax (ours) & Softmax attention & Mean pooling\\
+\midrule
+$256$  & 16 & $\mathbf{0.917}$ & $0.823$ & $0.828$\\
+$256$  & 24 & $0.844$ & $\mathbf{0.856}$ & $0.774$\\
+$256$  & 31 & $0.544$ & $\mathbf{0.812}$ & $0.722$\\
+$1024$ & 16 & $\mathbf{0.906}$ & $0.457$ & $0.500$\\
+$1024$ & 24 & $\mathbf{0.783}$ & $0.642$ & $0.655$\\
+$1024$ & 31 & $0.476$ & $0.703$ & $\mathbf{0.759}$\\
+$4096$ & 16 & $0.757$ & $0.701$ & $\mathbf{0.807}$\\
+$4096$ & 24 & $\mathbf{0.764}$ & $0.639$ & $0.646$\\
+$4096$ & 31 & $\mathbf{0.586}$ & $0.576$ & $0.575$\\
+\midrule
+\multicolumn{2}{l}{mean over all cells} & $\mathbf{0.731}$ & $0.690$ & $0.696$\\
+\bottomrule
+\end{tabular}
+\caption{Detection AUROC on real Mistral-7B-v0.1 residual streams under a
+\emph{needle-disjoint} split: the six harmful sentences used at test time never appear in
+training. 24 positives and 24 negatives per cell. MultiMax wins 5 of 9 cells and the mean,
+by a narrow margin.}
+\label{tab:realllm}
+\end{table}
+
+\paragraph{A leak we found and closed.} Our first split held out sequences by index. Since
+each of the 12 needle sentences recurs four times across 48 sequences, both halves
+contained every needle, and the probe was scored on sentences it had trained on, differing
+only in filler placement. That measures memorisation of 12 strings, not generalisation to
+unseen harmful intent, and it inflated MultiMax by $+0.106$ mean AUROC ($0.837$ against
+the $0.731$ in Table~\ref{tab:realllm}). Softmax pooling gained $+0.036$ and mean pooling
+actually lost $0.017$, so the leak flattered the hard maximum specifically. Every real-model
+number we report is from the needle-disjoint split; the index-split figures are retained in
+the artifact for comparison. We flag this because the size of the effect, a tenth of an
+AUROC point, is larger than most of the differences such tables are used to argue about.
+
+\paragraph{Result.} On the honest split MultiMax still leads, with mean AUROC $0.731$
+against $0.690$ for softmax pooling and $0.696$ for mean pooling, and wins 5 of the 9
+cells. That is a real but modest lead, and considerably narrower than the synthetic
+benchmarks suggest. The systems claim survives far more cleanly than the detection claim:
+at the model's true width the MultiMax overhead is flat at $8.0$\,MiB across a $32\times$
+range of $N$, while softmax pooling grows from $28.0$\,MiB to $641.0$\,MiB, a ratio of
+$80\times$ at $N=131{,}072$. The asymmetry is the paper's thesis in miniature. The
+architectural claim transfers to real activations essentially unchanged; the detection
+advantage transfers, but shrinks.
+
+\paragraph{Where it fails, and what that tells us.} MultiMax degrades sharply with depth.
+Averaged over lengths it scores $0.860$ at layer 16, $0.797$ at layer 24 and $0.535$ at
+layer 31, which is indistinguishable from chance; at $N{=}1024$, layer 31 it reaches
+$0.476$, slightly \emph{worse} than chance, while mean pooling on the same activations
+reaches $0.759$. We read this as the final-layer residual stream being dominated by
+next-token prediction structure, in which the single most extreme coordinate along a
+learned direction is a poor summary of a diffuse property like intent. This is a concrete,
+model-side instance of the limit the paper argues for throughout: the hard maximum is the
+right reduction when evidence is concentrated and the wrong one when it is spread. It also
+gives a deployment rule that costs nothing to follow, namely to site the probe mid-stack
+rather than at the final layer.
+
+\subsection{Batched systems scaling}
+\label{sec:batched}
+
+Every systems number above and in \S\ref{sec:systems} is at batch size $1$, and
+deployments batch. Table~\ref{tab:batched} sweeps $B\in\{1,2,4,8,16\}$ at $N{=}65{,}536$,
+reporting overhead above the input tensor rather than total allocation. The distinction
+matters: the input is a cost the serving stack already pays, and including it compresses
+every aggregator toward the same number and hides the difference between them.
+
+\begin{table}[!ht]
+\centering\small
+\begin{tabular}{rcccccc}
+\toprule
+& \multicolumn{2}{c}{MultiMax (ours)} & \multicolumn{2}{c}{Softmax attention}
+  & \multicolumn{2}{c}{Mean pooling}\\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+$B$ & MiB/seq & latency & MiB/seq & latency & MiB/seq & latency\\
+\midrule
+$1$  & $8.0$  & $4.24$\,ms  & $320.5$ & $6.96$\,ms   & $24.0$ & $4.47$\,ms\\
+$2$  & $20.0$ & $12.35$\,ms & $320.5$ & $13.89$\,ms  & $22.0$ & $12.88$\,ms\\
+$4$  & $20.0$ & $24.14$\,ms & $320.5$ & $27.95$\,ms  & $20.0$ & $27.28$\,ms\\
+$8$  & $20.0$ & $50.54$\,ms & $320.5$ & $50.02$\,ms  & $20.0$ & $53.63$\,ms\\
+$16$ & $\mathbf{20.0}$ & $\mathbf{92.68}$\,ms & $320.5$ & $320.57$\,ms
+     & $20.0$ & $105.31$\,ms\\
+\bottomrule
+\end{tabular}
+\caption{Batched cost at $N{=}65{,}536$, overhead above the input tensor, per sequence.
+MultiMax and mean pooling settle at $20.0$\,MiB per sequence from $B{=}2$ onward; softmax
+pooling holds $320.5$\,MiB per sequence at every batch size. At $B{=}16$ the totals are
+$320$\,MiB against $5128$\,MiB, a factor of $16$.}
+\label{tab:batched}
+\end{table}
+
+Two things are worth separating here. The per-sequence advantage over softmax pooling is
+$16\times$ and holds at every batch size, which is the result the memory law predicts. The
+per-sequence figure for MultiMax is \emph{not} constant in $B$, though: it rises from
+$8.0$\,MiB at $B{=}1$ to $20.0$\,MiB at $B{=}2$ and then stays there. We attribute the step
+to allocator behaviour rather than to the reduction, since the carried state is
+$(B,H)$ and scales exactly linearly by construction, but we report the measurement rather
+than the model. The latency separation appears only at the top of the sweep: MultiMax and
+softmax pooling are within $1\%$ of each other at $B{=}8$ and differ by $3.5\times$ at
+$B{=}16$ ($92.68$ against $320.57$\,ms), which is where the softmax intermediate stops
+fitting comfortably and the kernel starts paying for it.
 
 \subsection{Benchmark A: systems scaling}
 \label{sec:systems}
@@ -586,7 +800,197 @@ as Prop.~\ref{prop:mean} requires. Without annealing the same architecture score
 $0.00/0.00$ at $S{=}0.10$: the gap between the two MultiMax rows in
 Fig.~\ref{fig:anneal} is the entire contribution of \S\ref{sec:annealing}.
 
-\subsection{Benchmark C: distributed attacks}
+\subsection{Normalisation, drift, and what calibration transfer does not show}
+\label{sec:drift}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_drift_and_calibration.pdf}
+\caption{(a) The offset between unnormalised and normalised LogSumExp, against the closed
+form $H\tau\log N$. (b) The benign maximum against $\sqrt{\log N}$, with the least-squares
+fit and the asymptotic prediction. (c) Brier score at each evaluation length under a
+single Platt map fitted at $N{=}4096$ and under per-length recalibration.}
+\label{fig:drift}
+\end{figure}
+
+Three analytic claims in \S\ref{sec:agg}--\S\ref{sec:annealing} had never been checked
+against their own predictions. Two are confirmed and the third is not established, which
+we report as such.
+
+\paragraph{The normalisation term is exact.} Evaluating both operators on identical head
+scores, the measured offset between unnormalised and normalised LogSumExp matches
+$H\tau\log N$ to within $3.6\times10^{-6}$ at every $(N,\tau)$ tested, across
+$N\in[512,\,131{,}072]$ and $\tau\in\{0.5,1\}$. At $N{=}131{,}072$, $\tau{=}1$ the offset
+is $94.27$ logits. This is not an approximation that happens to be close: it is an
+identity, and it is why Remark~\ref{rem:normalisation} treats the $1/N$ as load-bearing
+rather than cosmetic.
+
+\paragraph{The drift is the predicted shape, with a slope $7\%$ above theory.} Fitting
+$\mathbb{E}[\max_j\varepsilon_j]=a+b\sqrt{\log N}$ over $N\in[10^2,10^5]$ gives
+$b=1.513$ against the asymptotic $\tau\sqrt2=1.414$, with $R^2=0.999$. The functional form
+of Remark~\ref{rem:fpr} is confirmed; the slope sits slightly high and the fitted
+intercept is negative ($-0.735$), which is expected, since the asymptotic expression drops
+lower-order terms that are still material at $N=10^2$.
+
+\paragraph{A claim we cannot support.} \S\ref{sec:cascade} recalibrates per length. We
+tested whether that is \emph{necessary} by fitting one Platt map at $N{=}4096$ and
+applying it unchanged at $1$k, $32$k and $128$k. The mean logit does drift exactly as
+predicted, rising by $1.52$ from $N{=}1024$ to $N{=}131{,}072$. But the transferred map
+loses nothing measurable: Brier stays at $0.0000$ and accuracy at $1.000$ at every length,
+and the gap to per-length recalibration is $1.6\times10^{-8}$. The reason is
+uninteresting and worth stating plainly, namely that at these signal strengths the classes
+are separated well enough that a shift of $1.5$ logits never moves the boundary between
+them. So the drift is real and measured, and the case for per-length recalibration is
+\emph{not} established by this experiment. We keep the per-length protocol because it is
+free and because Remark~\ref{rem:fpr} predicts the drift will eventually bite at weaker
+separation, but we no longer present it as an empirically forced choice.
+
+\subsection{Hyperparameter ablation: the bounding link and the head count}
+\label{sec:ablation}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_ablation_grid.pdf}
+\caption{(a) Out-of-distribution AUROC over the $c\times H$ grid: probes train at
+$N{=}512$ and are scored at $N{=}16{,}384$. The usable region is a staircase, and the
+$c$ required grows with $H$. (b) Coefficient of variation of the gradient norm across
+training, a scale-free stability measure comparable across $H$. (c) Gradient norm under
+deliberate saturation, by compute precision.}
+\label{fig:ablation}
+\end{figure}
+
+\begin{table}[!ht]
+\centering\small
+\begin{tabular}{rccccc}
+\toprule
+& \multicolumn{5}{c}{head count $H$}\\
+\cmidrule(lr){2-6}
+clamp $c$ & $1$ & $4$ & $8$ & $16$ & $32$\\
+\midrule
+$1$  & $0.500$ & $0.500$ & $0.500$ & $0.500$ & $0.500$\\
+$2$  & $0.500$ & $0.500$ & $0.500$ & $0.500$ & $0.500$\\
+$5$  & $\mathbf{1.000}$ & $\mathbf{0.975}$ & $0.500$ & $0.500$ & $0.500$\\
+$10$ & $\mathbf{1.000}$ & $\mathbf{1.000}$ & $\mathbf{1.000}$ & $\mathbf{1.000}$ &
+$\mathbf{1.000}$\\
+\bottomrule
+\end{tabular}
+\caption{Out-of-distribution AUROC, trained at $N{=}512$ and evaluated at $N{=}16{,}384$
+at weak signal $S{=}0.15$. Bold marks cells above chance. The boundary is a staircase in
+$(c,H)$, not a preference for either parameter alone: every $H$ reaches $1.000$ at some
+$c$, and no $c$ below $5$ works at any $H$.}
+\label{tab:ablation}
+\end{table}
+
+The grid is not the smooth trade-off one might expect. Every cell at $c\le2$ scores
+\emph{exactly} $0.500$, and so do $H\ge8$ at $c=5$. Exactly chance, with the identical
+training loss across all $H$ at fixed $c$ ($0.8133$ at $c{=}1$, $1.1269$ at $c{=}2$), is
+the signature of a constant output rather than of a weak one.
+
+\paragraph{The mechanism, measured rather than assumed.} The suspect is the bounded link.
+The logit of \eqref{eq:multimax} is a \emph{sum} of $H$ per-head maxima, so $|z|$ scales
+with $H$; if it exceeds $c$ for every input, the clamp maps every sequence to the same
+value, all scores tie, and AUROC is $0.500$ by construction. We tested this by recording
+the \emph{pre-clamp} logit at both lengths rather than inferring it
+(Table~\ref{tab:saturation}).
+
+The measurement confirms the mechanism and corrects our first guess about it. We expected
+saturation to be a deployment-length effect, appearing at $N{=}16{,}384$ in probes that
+were healthy at $N{=}512$. It is not. Every failing cell is already pinned at the training
+length, with a mean pre-clamp $|z|$ of $1605.6$ at $c{=}1$, $344.3$ at $c{=}2$ and $69.9$
+at $c{=}5$, in each case one to two orders of magnitude outside the interval. These probes
+never escape the flat region at all; the identical training losses across $H$ at fixed $c$
+are the constant-output signature of that, and the low absolute loss at $c{=}5$ ($0.0216$)
+simply reflects a constant that happens to sit near the class balance.
+
+\begin{table}[!ht]
+\centering\small
+\begin{tabular}{rrcccccc}
+\toprule
+& & & \multicolumn{2}{c}{at $N{=}512$ (train)} & \multicolumn{2}{c}{at $N{=}16{,}384$}\\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+$c$ & $H$ & AUROC & mean $|z|$ & saturated & mean $|z|$ & saturated\\
+\midrule
+$1$  & $8$  & $0.500$ & $1605.6$ & $1.00$ & $1605.9$ & $1.00$\\
+$2$  & $8$  & $0.500$ & $344.3$  & $1.00$ & $348.1$  & $1.00$\\
+$5$  & $8$  & $0.500$ & $69.9$   & $1.00$ & $70.6$   & $1.00$\\
+$10$ & $1$  & $1.000$ & $3.5$    & $0.00$ & $3.5$    & $0.00$\\
+$10$ & $8$  & $1.000$ & $6.9$    & $0.00$ & $7.5$    & $0.00$\\
+$10$ & $32$ & $1.000$ & $7.8$    & $0.00$ & $11.4$   & $1.00$\\
+\bottomrule
+\end{tabular}
+\caption{Pre-clamp logit magnitude and saturated fraction, measured on positive
+sequences. Every chance-level cell is pinned far outside $[-c,c]$ at \emph{both} lengths,
+so the failure is a training pathology rather than a length-generalisation one. The last
+row is the informative exception and is discussed in the text.}
+\label{tab:saturation}
+\end{table}
+
+\paragraph{Saturation alone is not fatal.} The last row of Table~\ref{tab:saturation} is
+the reason to measure rather than argue. At $c{=}10$, $H{=}32$ the positives are fully
+saturated at $N{=}16{,}384$ ($|z|=11.4>c$) and the probe still scores AUROC $1.000$. The
+naive reading, saturation implies chance, is therefore false. What destroys ranking is not
+saturation of one class but saturation of \emph{both} onto the same bound: while the
+negatives remain inside the interval, the clamp still separates the classes. This also
+explains why $H$ enters the staircase only through $|z|$: raising $H$ raises the logit
+scale, which brings the positive class to the bound first and both classes to the bound
+soon after.
+
+\paragraph{What this means for practice.} $c$ is not a free safety margin to be set small.
+It must be large enough that the two classes are not both pinned at the operating length,
+and since $|z|$ grows with $H$ the required $c$ grows with $H$ too. Our default $c{=}10$,
+$H{=}8$ sits inside the usable region with margin, and $c{=}10$ succeeded at every $H$ we
+tried. The practical check is cheap and does not require labels: monitor the fraction of
+pre-clamp logits outside $[-c,c]$ and the spread of $z$ within each class, rather than
+waiting for AUROC to collapse.
+
+\subsection{Compute precision and the straight-through clamp}
+\label{sec:precision}
+
+Remark~\ref{rem:clamp} claims a plain clamp zeroes the gradient in the saturated region
+and the straight-through estimator does not. That was measured once, in one precision.
+Table~\ref{tab:precision} repeats it in fp16, bf16 and fp32 under deliberate saturation, a
+raw logit of about $46.5$ against $c{=}10$.
+
+\begin{table}[!ht]
+\centering\small
+\begin{tabular}{lccccc}
+\toprule
+compute dtype & raw logit & \multicolumn{2}{c}{gradient norm} &
+\multicolumn{2}{c}{non-zero gradient fraction}\\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+& & straight-through & plain clamp & straight-through & plain clamp\\
+\midrule
+fp16 & $46.54$ & $7.119\times10^{2}$ & $0.000$ & $1.000$ & $0.000$\\
+bf16 & $46.59$ & $7.121\times10^{2}$ & $0.000$ & $1.000$ & $0.000$\\
+fp32 & $46.54$ & $7.116\times10^{2}$ & $0.000$ & $1.000$ & $0.000$\\
+\bottomrule
+\end{tabular}
+\caption{Gradient survival under saturation, by compute precision. All gradients were
+finite in every configuration. The result is precision-independent: the plain clamp is
+dead in all three, and the straight-through estimator keeps every parameter receiving
+gradient in all three.}
+\label{tab:precision}
+\end{table}
+
+The outcome is uniform: the plain clamp yields exactly $0.000$ gradient norm and a
+non-zero gradient fraction of $0.000$ in all three precisions, while the straight-through
+version keeps the fraction at $1.000$ with a gradient norm near $712$ in each. No output
+was non-finite in any configuration. This is a negative result about precision and a
+positive one about the estimator: the failure Remark~\ref{rem:clamp} identifies is
+structural, arising from the derivative $\mathbb{1}[|z|<c]$ rather than from rounding, so
+it cannot be escaped by changing dtype and does not need to be.
+
+% =====================================================================================
+\section{Adversarial Fragmentation and Cascades}
+\label{sec:adversarial}
+% =====================================================================================
+The maximum has one structural adversary: an attacker who keeps the total injected budget
+fixed and spreads it thinly enough that no single token stands out. This section measures
+that attack under progressively fairer conditions, tests the two countermeasures the paper
+previously only proposed, and replaces the simulated second stage of the cascade with a
+real guardrail model.
+
+\subsection{Benchmark C: distributed attacks with known $m$}
 \label{sec:distributed}
 \begin{figure}[t]
 \centering
@@ -651,8 +1055,147 @@ cannot reduce. This is the sharpest evidence in the paper that our recommendatio
 architectural rather than a claim of dominance; it also converts the ensembling suggestion
 of \S\ref{sec:countermeasures} from speculation into a measured complementarity.
 
+\subsection{Unknown $m$, mixed structure, and the two proposed countermeasures}
+\label{sec:unknownm}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_mixed_fragmentation.pdf}
+\caption{(a) AUROC against fragmentation width under an unknown-$m$ protocol: probes train
+on a mixture $m\in\{1,8,64\}$ and are evaluated at held-out widths. (b) The mixed
+adversary, which retains a concentrated core carrying half the budget. (c) Per-sequence
+overhead against batch size at $N{=}65{,}536$.}
+\label{fig:mixedfrag}
+\end{figure}
+
+Benchmark C trains on the same $m$ it evaluates, which hands the defender knowledge the
+adversary chooses. Here probes train on a mixture $m\in\{1,8,64\}$ and are scored at
+$m\in\{1,4,16,64,256\}$, so three of the five widths are held out. We add the two
+countermeasures \S\ref{sec:countermeasures} proposed but never tested: streaming Top-$r$
+with $r{=}8$, and a Mean-Max ensemble carrying separate head matrices for a running maximum
+and a running mean.
+
+\begin{table}[!ht]
+\centering\small
+\begin{tabular}{lccccc}
+\toprule
+& \multicolumn{5}{c}{fragmentation width $m$ (held out except $m{=}1,64$)}\\
+\cmidrule(lr){2-6}
+probe & $1$ & $4$ & $16$ & $64$ & $256$\\
+\midrule
+MultiMax (ours)          & $1.000$ & $1.000$ & $1.000$ & $0.649$ & $0.429$\\
+Top-$r$ ($r{=}8$)        & $1.000$ & $1.000$ & $1.000$ & $\mathbf{0.908}$ & $0.469$\\
+Mean-Max ensemble        & $1.000$ & $1.000$ & $1.000$ & $0.575$ & $0.414$\\
+Softmax attention        & $1.000$ & $1.000$ & $1.000$ & $0.804$ & $0.749$\\
+Mean pooling             & $0.782$ & $0.821$ & $0.729$ & $0.741$ & $\mathbf{0.761}$\\
+\bottomrule
+\end{tabular}
+\caption{AUROC under unknown-$m$ fragmentation at $N{=}16{,}384$ with a fixed budget
+$S{=}2.0$. Bold marks the best probe at the two widths past the failure boundary. No
+aggregator is best everywhere, and the ordering inverts across the boundary.}
+\label{tab:unknownm}
+\end{table}
+
+\paragraph{Top-$r$ works, and it works past where it should.} Replacing the maximum by the
+mean of the $r$ largest scores lifts AUROC at $m{=}64$ from $0.649$ to $0.908$, recovering
+most of the gap to softmax pooling while keeping the streaming property, since a running
+top-$r$ buffer is $\Theta(r)$ state. The naive prediction was that Top-$r$ should help up
+to about $m\approx r=8$ and no further; it in fact helps substantially at $m{=}64$, eight
+times that. We do not have a clean account of why, and flag it as the most promising
+loose thread here. At $m{=}256$ the advantage is gone ($0.469$ against $0.429$), so
+Top-$r$ moves the boundary rather than removing it.
+
+\paragraph{The Mean-Max ensemble does not work, and we predicted that it would.}
+\S\ref{sec:countermeasures} argued that because the maximum and the mean fail on disjoint
+geometries, their sum should be at least as good as either member everywhere. It is not.
+At $m{=}64$ Mean-Max scores $0.575$, \emph{below} the plain maximum's $0.649$, and at
+$m{=}256$ it scores $0.414$ against mean pooling's $0.761$. Concatenating the two
+reductions and training end to end lets the optimiser lean on whichever member is stronger
+on the training mixture, which here is the maximum, and the mean-pooled heads never
+receive the gradient signal that would make them useful at widths absent from training.
+Ensembling aggregators may still be right, but it evidently requires the members to be
+trained or weighted separately rather than summed inside one objective, and the claim in
+\S\ref{sec:countermeasures} should be read as refuted in the form we stated it.
+
+\paragraph{A mixed adversary is easier, not harder.} We also tested an adversary splitting
+the budget between a concentrated four-token core and a diffuse smear over $4m$ tokens.
+Every peaked aggregator scores $1.000$ at every $m$ against it
+(Fig.~\ref{fig:mixedfrag}(b)). This is the expected result once stated: a maximum needs
+only one token above threshold, so an adversary who keeps any concentrated component
+concedes the detection. It also sharpens what the fragmentation attack requires. The
+attacker must spread the budget \emph{uniformly}; a hybrid that hedges is strictly worse
+for them than committing, which narrows the space of effective attacks against a hard
+maximum considerably more than \S\ref{sec:distributed} suggested.
+
+\subsection{A concrete cascade with a deployed guardrail as stage 2}
+\label{sec:cascadeeval}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\textwidth]{figures/fig_cascade_pipeline.pdf}
+\caption{The evaluated cascade. Stage 1 is a MultiMax probe over Mistral-7B residuals,
+Platt-calibrated and gated on $|\hat p-\frac12|<\delta$; stage 2 is
+SGuard-ContentFilter-2B, run in full. Escalated traffic pays the stage-2 cost, confident
+traffic does not.}
+\label{fig:cascade}
+\end{figure}
+
+The cascade in \S\ref{sec:cascade} used a deterministic stand-in for stage 2 and said so.
+Every cost and safety number it produced was therefore a statement about the stand-in.
+Here stage 2 is SGuard-ContentFilter-2B \citep{lee2025sguard}, a deployed guardrail model,
+run for real on the same 48 held-out sequences. SGuard emits one special token per risk
+category, so we read the softmax over each category's \{safe, unsafe\} token pair directly
+from the logits and take the maximum across categories, giving a genuine probability
+rather than a parsed string.
+
+\begin{table}[!ht]
+\centering\small
+\begin{tabular}{lccccc}
+\toprule
+operating point & escalated & AUROC & ASR & FLOPs vs.\ always-on & latency\\
+\midrule
+probe only                     & $0.000$ & $0.554$ & $0.500$ & $0.0010$ & $0.37$\,ms\\
+cascade, $50\%$ budget         & $0.500$ & $0.625$ & $\mathbf{0.208}$ & $0.5005$
+                               & $798$\,ms\\
+SGuard on everything           & $1.000$ & $\mathbf{0.997}$ & $0.333$ & $1.0000$
+                               & $1595$\,ms\\
+\bottomrule
+\end{tabular}
+\caption{End-to-end cascade against a real stage 2, $N{=}512$, 48 held-out sequences.
+ASR is the fraction of harmful sequences the composed system fails to flag. Escalation
+budgets below $50\%$ are omitted because they escalate nothing; see the text.}
+\label{tab:cascade}
+\end{table}
+
+\paragraph{The economics are as claimed.} A stage-1 pass costs $0.104\%$ of a stage-2 pass
+in FLOPs and $0.37$\,ms against $1595$\,ms in measured latency, a factor of about $4300$.
+That gap is the entire reason to build a cascade, and it is larger than the paper's cost
+model assumed.
+
+\paragraph{The gate, at this stage-1 quality, does not work.} Every escalation budget from
+$1\%$ to $25\%$ escalates \emph{nothing}. The cause is visible in the fitted Platt
+parameters: $a=95.9$ maps almost every logit to $\hat p\in\{0,1\}$, so $|\hat p-\frac12|$
+is near $\frac12$ everywhere and no quantile of it produces a usable band. A weak stage 1
+is not merely a weak detector; it destroys the uncertainty signal the gate depends on.
+This is a failure mode \S\ref{sec:cascade} did not anticipate, and it is a direct
+consequence of stage 1's AUROC being $0.554$ here, far below the $0.917$ it reaches at
+layer 16 in Table~\ref{tab:realllm}. We report the cascade at the configuration we
+actually measured rather than at the probe's best layer.
+
+\paragraph{An unexpected complementarity.} At a $50\%$ budget the composed system reaches
+an attack success rate of $0.208$, \emph{better} than running SGuard on all traffic
+($0.333$) at half the compute. That is not a rounding artifact: SGuard itself misses a
+third of these attacks, because a single harmful sentence buried in benign filler is
+exactly the long-context dilution failure \citet{chen2026longguard} document, and some of
+the sequences it misses are ones the probe catches. The two stages fail on partly disjoint
+inputs. We are wary of over-reading a result at $n{=}48$ with a weak stage 1, and state it
+as a hypothesis worth testing properly rather than as a headline: a cascade may be worth
+building for coverage as well as for cost, because a cheap monitor with different failure
+modes is not merely a cheaper version of the expensive one.
+
 % =====================================================================================
-\section{Related Work}
+\section{Related Work and Discussion}
+\label{sec:related}
 % =====================================================================================
 \subsection{Mechanistic interpretability and linear probing}
 Reading a concept off intermediate representations with a trained classifier dates to
@@ -723,6 +1266,45 @@ the detection decision collapses. They measure a monotone recall drop of more th
 across fifteen guardrails over a $0.25$k--$32$k span, and attribute it to proportional
 dilution of the needle rather than to absolute length.
 
+\subsection{Activation monitors and guardrail models at deployment scale}
+\label{sec:guardrails}
+
+Two lines of work bracket ours, and the contrast with each is a contrast in what is being
+held fixed.
+
+\emph{Activation monitors.} \citet{rozenfeld2026gavel} monitor activations against
+predicate rules defined over elemental concepts, so that an operator can reconfigure
+safety policy without retraining a detector. \citet{das2026neurofilter} apply
+activation-based guardrails to privacy-sensitive agent traffic and argue the same
+economic case we do, that reading activations is far cheaper than running a second model.
+Both take the reduction from activations to a score as given and vary the concept
+vocabulary or the rule layer above it. We do the opposite, holding the concept and the
+token transform fixed and varying only the reduction, which is why our results are stated
+as a memory law and an optimisation obstruction rather than as a detection benchmark. The
+two are complementary: a rule engine in the style of GAVEL still needs each predicate
+evaluated by some reduction, and at $131{,}072$ tokens the choice of that reduction is the
+difference between $8.0$\,MiB and $641.0$\,MiB per predicate
+(Fig.~\ref{fig:realllm}(a)).
+
+\emph{Guardrail models.} The deployed alternative to a probe is a dedicated classifier.
+\citet{lee2025sguard} release SGuard-v1, a pair of 2B-parameter filters over a
+Granite-3.3-2B backbone that emit per-category risk labels and are explicitly positioned
+as lightweight. Lightweight is relative: a 2B forward pass is roughly four orders of
+magnitude more arithmetic than a probe pass over the same tokens
+(\S\ref{sec:cascadeeval}), and its cost is paid on every request rather than on the
+ambiguous fraction. That is precisely the gap a cascade is for, and it is why
+\S\ref{sec:cascadeeval} instantiates stage 2 with SGuard-ContentFilter-2B rather than with
+a stand-in.
+
+\emph{Protocol-aware injection.} The fragmentation adversary of \S\ref{sec:adversarial}
+is a protocol-aware attack in the sense of \citet{gardnerchallis2026untrusted}: it is
+constructed against the monitor's aggregation rule rather than against the model's
+refusal behaviour. Defences that assume the attacker writes a recognisably harmful span
+do not bind here, because the attacker's budget is deliberately spread below the
+per-token threshold that any peak-seeking detector relies on.
+
+\subsection{What none of this addresses}
+
 Both stop short of an aggregation-controlled comparison with a memory law attached. Neither
 reports the optimisation obstruction of Theorem~\ref{lem:sparsity}, which is invisible
 unless one trains a hard-max probe at weak signal, nor the fragmentation boundary of
@@ -730,7 +1312,7 @@ unless one trains a hard-max probe at weak signal, nor the fragmentation boundar
 specifically.
 
 % =====================================================================================
-\section{Discussion, Rebuttal Analysis, and Limitations}
+\subsection{Discussion, rebuttal analysis, and limitations}
 % =====================================================================================
 \paragraph{What we do and do not claim.}
 Combining Props.~\ref{prop:mean}--\ref{prop:softmax}, Rem.~\ref{rem:sparsity} and
@@ -752,7 +1334,7 @@ appendix; it is why our claim is architectural rather than a detection claim.
 chunk ablation of Rem.~\ref{rem:complexity}, which replaces an $\mathcal{O}(1)$ assertion
 with the measured law $\Theta(\min(C,N))$.
 
-\subsection{Deployment mechanics: bandwidth, not FLOPs}
+\subsubsection{Deployment mechanics: bandwidth, not FLOPs}
 \label{sec:deployment}
 
 The systems argument is easy to misread as being about compute. It is not. All three
@@ -787,7 +1369,7 @@ a direct trade: $C{=}512$ costs $12.1$\,MiB, $C{=}4096$ costs $19.1$\,MiB, and l
 buys occupancy at linear memory cost until $C$ approaches $N$, where the streaming property
 is lost entirely.
 
-\subsection{Adversarial countermeasures against fragmentation}
+\subsubsection{Adversarial countermeasures against fragmentation}
 \label{sec:countermeasures}
 
 \S\ref{sec:distributed} establishes that a budget-preserving adversary defeats both pooled

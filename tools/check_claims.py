@@ -175,6 +175,147 @@ def main() -> int:
         checks.append((f"stale figure {stale} only in the superseded note", ok,
                        f"{len(hits)} occurrence(s)"))
 
+    # ==================================================================================
+    # Reviewer-response experiments (artifacts/exp*.json). Same rule as above: every
+    # number the new sections quote must be reproducible from an artifact, or the paper
+    # is asserting something no run supports.
+    # ==================================================================================
+    def art(name):
+        p = ROOT / "artifacts" / name
+        return json.loads(p.read_text()) if p.exists() else None
+
+    def has(val, doc=None):
+        return val in (paper if doc is None else doc)
+
+    e1 = art("exp1_real_residuals.json")
+    if e1:
+        sp = e1["verdicts"]["split_comparison_mean_auroc"]
+        for kind, want in (("multimax", "0.731"), ("softmax_attn", "0.690"),
+                           ("mean_pool", "0.696")):
+            v = sp[kind]["needle_split"]
+            checks.append((f"E1 needle-split mean AUROC {kind}",
+                           f"{v:.3f}" == want and has(want),
+                           f"artifact {v:.4f}, paper expects {want}"))
+        gap = e1["verdicts"]["leakage_gap_multimax"]
+        checks.append(("E1 leakage gap 0.106", f"{gap:.3f}" == "0.106" and has("0.106"),
+                       f"artifact {gap:.4f}"))
+        det = e1["detection"]
+        for L, want in ((16, "0.860"), (24, "0.797"), (31, "0.535")):
+            v = [r["auroc"] for r in det if r["probe"] == "multimax" and r["layer"] == L]
+            m = sum(v) / len(v)
+            checks.append((f"E1 multimax layer-{L} mean {want}",
+                           f"{m:.3f}" == want and has(want), f"artifact {m:.4f}"))
+        sysrows = [r for r in e1["systems"] if not r.get("oom")]
+        mm = [r["peak_overhead_mib"] for r in sysrows
+              if r["probe"] == "multimax" and r["N"] >= 4096]
+        # Compared at the precision the paper QUOTES (one decimal). The raw values differ
+        # in the fourth decimal (8.00049 vs 8.00098 MiB) because the allocator rounds to
+        # pages; requiring exact equality would fail a claim that is true as stated.
+        mm_r = {f"{v:.1f}" for v in mm}
+        checks.append(("E1 multimax overhead flat at 8.0 MiB",
+                       mm_r == {"8.0"} and has("8.0 MiB"),
+                       f"artifact rounds to {sorted(mm_r)} from {sorted(set(mm))}"))
+        sm = next(r["peak_overhead_mib"] for r in sysrows
+                  if r["probe"] == "softmax_attn" and r["N"] == 131072)
+        checks.append(("E1 softmax overhead 641.0 MiB @131k",
+                       f"{sm:.1f}" == "641.0" and has("641.0"), f"artifact {sm}"))
+
+    e2 = art("exp2_ablations.json")
+    if e2:
+        for c_, H_, want in ((1.0, 8, "0.500"), (5.0, 1, "1.000"), (10.0, 32, "1.000"),
+                             (5.0, 4, "0.975")):
+            v = next(r["auroc_ood"] for r in e2["grid"]
+                     if r["c"] == c_ and r["H"] == H_)
+            checks.append((f"E2 grid c={c_} H={H_} = {want}",
+                           f"{v:.3f}" == want and has(want), f"artifact {v:.4f}"))
+        for c_, want in ((1.0, "0.8133"), (2.0, "1.1269")):
+            v = next(r["final_loss"] for r in e2["grid"] if r["c"] == c_ and r["H"] == 8)
+            checks.append((f"E2 constant loss at c={c_}", f"{v:.4f}" == want and has(want),
+                           f"artifact {v:.5f}"))
+        checks.append(("E2 plain clamp dead in all dtypes",
+                       e2["verdicts"]["plain_clamp_dead_all_dtypes"] is True, ""))
+        checks.append(("E2 STE alive in all dtypes",
+                       e2["verdicts"]["ste_rescues_all_dtypes"] is True, ""))
+
+    e2b = art("exp2b_saturation.json")
+    if e2b:
+        for c_, H_, want in ((1.0, 8, "1605.6"), (2.0, 8, "344.3"), (5.0, 8, "69.9")):
+            r = next(x for x in e2b["cells"] if x["c"] == c_ and x["H"] == H_)
+            v = r["train_len"]["mean_abs_raw"]
+            checks.append((f"E2b pre-clamp |z| c={c_} = {want}",
+                           f"{v:.1f}" == want and has(want), f"artifact {v:.2f}"))
+        checks.append(("E2b all dead cells saturated",
+                       e2b["verdicts"]["dead_cells_saturated_at_eval"] is True, ""))
+
+    e3 = art("exp3_drift_calibration.json")
+    if e3:
+        v = e3["verdicts"]
+        checks.append(("E3 LSE matches closed form", v["lse_gap_matches_H_tau_logN"] is True,
+                       f"max err {v['lse_max_abs_error_vs_closed_form']:.2e}"))
+        checks.append(("E3 drift slope 1.513",
+                       f"{v['drift_slope_measured']:.3f}" == "1.513" and has("1.513"),
+                       f"artifact {v['drift_slope_measured']:.4f}"))
+        checks.append(("E3 drift R^2 0.999",
+                       f"{v['drift_r_squared']:.3f}" == "0.999" and has("0.999"),
+                       f"artifact {v['drift_r_squared']:.4f}"))
+        checks.append(("E3 logit drift 1.52",
+                       f"{v['logit_drift_1k_to_max']:.2f}" == "1.52" and has("1.52"),
+                       f"artifact {v['logit_drift_1k_to_max']:.3f}"))
+        # the paper says recalibration is NOT empirically forced; the artifact must agree
+        checks.append(("E3 no transfer penalty (paper says so)",
+                       v["per_length_recalibration_needed"] is False,
+                       f"gap {v.get('transfer_penalty_brier_gap')}"))
+
+    e4 = art("exp4_fragmentation.json")
+    if e4:
+        for probe, m_, want in (("multimax", 64, "0.649"), ("topr", 64, "0.908"),
+                                ("mean_max", 64, "0.575"), ("softmax_attn", 256, "0.749"),
+                                ("mean_pool", 256, "0.761"), ("multimax", 256, "0.429")):
+            r = [x for x in e4["fragmentation"] if x["probe"] == probe and x["m"] == m_
+                 and not x["mixed_structure"]]
+            if not r:
+                continue
+            checks.append((f"E4 unknown-m {probe}@{m_} = {want}",
+                           f"{r[0]['auroc']:.3f}" == want and has(want),
+                           f"artifact {r[0]['auroc']:.4f}"))
+        checks.append(("E4 mean_max does NOT dominate (paper says refuted)",
+                       e4["verdicts"]["mean_max_dominates_both_members"] is False, ""))
+        b16 = {r["probe"]: r for r in e4["batched"] if r.get("B") == 16
+               and not r.get("oom")}
+        if "multimax" in b16 and "softmax_attn" in b16:
+            checks.append(("E4 batched B=16 320 vs 5128 MiB",
+                           f"{b16['multimax']['overhead_above_input_mib']:.0f}" == "320"
+                           and f"{b16['softmax_attn']['overhead_above_input_mib']:.0f}"
+                           == "5128" and has("5128"), ""))
+            checks.append(("E4 batched B=16 latency 92.68 vs 320.57",
+                           f"{b16['multimax']['latency_ms']:.2f}" == "92.68"
+                           and f"{b16['softmax_attn']['latency_ms']:.2f}" == "320.57"
+                           and has("92.68") and has("320.57"), ""))
+
+    e5 = art("exp5_cascade.json")
+    if e5:
+        v = e5["verdicts"]
+        checks.append(("E5 stage1 AUROC 0.554",
+                       f"{v['stage1_auroc']:.3f}" == "0.554" and has("0.554"), ""))
+        checks.append(("E5 stage2 AUROC 0.997",
+                       f"{v['stage2_auroc']:.3f}" == "0.997" and has("0.997"), ""))
+        checks.append(("E5 stage2 is a real model",
+                       "SGuard" in v["stage2_is_real_model"], v["stage2_is_real_model"]))
+        checks.append(("E5 ASR always-stage2 0.333",
+                       f"{v['asr_always_stage2']:.3f}" == "0.333" and has("0.333"), ""))
+        mid = [r for r in e5["cascade"] if abs(r["escalation_rate"] - 0.5) < 1e-6]
+        if mid:
+            checks.append(("E5 cascade ASR at 50% budget 0.208",
+                           f"{mid[0]['attack_success_rate']:.3f}" == "0.208"
+                           and has("0.208"), f"artifact {mid[0]['attack_success_rate']}"))
+        checks.append(("E5 stage1/stage2 FLOPs ratio 0.104%",
+                       f"{v['flops_ratio_stage1_to_stage2'] * 100:.3f}" == "0.104"
+                       and has("0.104"), f"{v['flops_ratio_stage1_to_stage2']:.6f}"))
+        checks.append(("E5 latencies 0.37 ms and 1595 ms",
+                       f"{v['stage1_latency_ms']:.2f}" == "0.37"
+                       and f"{v['stage2_latency_ms']:.0f}" == "1595"
+                       and has("0.37") and has("1595"), ""))
+
     width = max(len(c[0]) for c in checks)
     npass = 0
     for name, ok, detail in checks:

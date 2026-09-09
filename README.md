@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/python-3.14-blue)
 ![PyTorch](https://img.shields.io/badge/pytorch-2.11%2Bcu128-ee4c2c)
-![claims](https://img.shields.io/badge/claim%20checks-41%2F41%20passing-brightgreen)
+![claims](https://img.shields.io/badge/claim%20checks-83%2F83%20passing-brightgreen)
 ![context](https://img.shields.io/badge/context-128%20→%20131%2C072-informational)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -27,6 +27,9 @@ transform fixed, and measures four reductions across $N \in [128,\;131{,}072]$.
 | **Calibration** | Sum-of-maxima logits are upward-biased. Platt scaling cuts Brier **0.0538 → 0.0122**, accuracy **0.931 → 0.988**. |
 | **Honest limit** | Under a fragmented attack MultiMax and softmax **fail together at $m{=}64$**, and past it softmax ranks better (AUROC **0.716 vs 0.523**). We do *not* claim a general detection advantage. |
 | **Sharpest result against us** | Mean pooling is *fragmentation-invariant*: AUROC moves only within **0.753–0.840** across a 256× spread of the same budget, and it is the **best** of the three at $m{=}256$. The aggregator that loses at $m{=}1$ wins at $m{=}256$, which is why aggregator diversity, not model diversity, is the principled ensembling axis. |
+| **Real residual streams** | On Mistral-7B-v0.1 (layers 16/24/31) the memory law holds unchanged: overhead flat at **8.0 MiB** from $N{=}4096$ to $131{,}072$ vs **641.0 MiB** for softmax pooling. Detection transfers but shrinks: mean AUROC **0.731** vs 0.690 / 0.696 under a needle-disjoint split, and MultiMax **collapses to chance at layer 31** (0.535). |
+| **A leak we closed** | Our first split shared needle sentences between train and test, inflating MultiMax by **+0.106** AUROC. All reported real-model numbers use the needle-disjoint split. |
+| **Cascade, real stage 2** | Stage 2 is **SGuard-ContentFilter-2B**, run for real: **0.104%** of its FLOPs and **0.37 ms vs 1595 ms**. SGuard alone still misses **1/3** of buried attacks; the cascade at a 50% budget reaches ASR **0.208**, better than always-on at half the compute. |
 | **Bandwidth, not FLOPs** | All three $\Theta(N)$-time aggregators issue the same $\Theta(Nmd)$ multiply-accumulates. Latency differs by only **1.4×** while memory differs by **34×**, the signature of a bandwidth-bound regime. At $N{=}131{,}072$, $m{=}512$ in bf16 one softmax intermediate is **128 MiB** exactly, so a write-then-read costs 256 MiB of avoidable traffic. |
 
 > **The defensible claim is architectural.** MultiMax is the right $\Theta(1)$-memory
@@ -53,7 +56,17 @@ Every cell is read from [`benchmark_results.json`](benchmark_results.json) and v
 
 ## Figures
 
-![architecture](figures/fig1_architecture.png)
+![architecture](figures/fig_arch_multimax.png)
+
+![cascade](figures/fig_cascade_pipeline.png)
+
+| real Mistral-7B residuals | $c \times H$ ablation |
+|---|---|
+| ![real](figures/fig_real_llm_performance.png) | ![abl](figures/fig_ablation_grid.png) |
+
+| drift & calibration | unknown-$m$ fragmentation |
+|---|---|
+| ![drift](figures/fig_drift_and_calibration.png) | ![frag](figures/fig_mixed_fragmentation.png) |
 
 | memory & latency scaling | annealing | distributed attack |
 |---|---|---|
@@ -133,10 +146,20 @@ python benchmark_suite.py            # --quick for a smaller ladder
 python suite_d_chunk_ablation.py     # answers "is O(1) just chunking?" -> Theta(min(C,N))
 
 # verification and artifacts
-python tools/check_claims.py         # 41/41 prose-vs-artifact checks (incl. paper.tex)
+python tools/check_claims.py         # 83/83 prose-vs-artifact checks (incl. paper.tex)
 python tools/check_tex.py            # structure, numbering, dangling refs + citations
 python tools/audit_bib.py            # every arXiv id re-resolved against the arXiv API
 python tools/make_figures.py         # figures/*.pdf and *.png
+python tools/make_diagrams.py        # architecture + cascade schematics
+python tools/make_result_figures.py  # the four reviewer-response figures
+
+# reviewer-response experiments (run in this order; each writes artifacts/exp*.json)
+python experiments/exp1_real_residuals.py --max-n 4096   # real Mistral-7B residuals
+python experiments/exp2_ablations.py                     # c x H grid, fp16/bf16/fp32
+python experiments/exp2b_saturation.py                   # why the dead cells are dead
+python experiments/exp3_drift_calibration.py             # LSE, drift, calibration transfer
+python experiments/exp4_fragmentation.py                 # unknown-m, Top-r, Mean-Max, batching
+python experiments/exp5_cascade.py                       # real SGuard-2B as stage 2
 
 # paper  (latexmk needs Perl; this sequence does not)
 pdflatex -interaction=nonstopmode paper.tex
@@ -168,9 +191,16 @@ BENCHMARK_NOTES.md           measured tables, bugs found, limitations
 benchmark_results.json       Suites A-D, verdicts          <- single source of truth
 logs/calibration_report.json Platt metrics + delta sweep
 tools/make_figures.py        all figures, driven from the JSON artifact
-tools/check_claims.py        verifies prose against artifacts (41 checks)
+tools/check_claims.py        verifies prose against artifacts (83 checks)
 tools/check_tex.py           LaTeX structure, numbering, refs + citation audit
 tools/audit_bib.py           re-resolves every arXiv id against the arXiv API
+tools/make_diagrams.py       architecture + cascade schematics (measured box layout)
+tools/make_result_figures.py the four empirical reviewer-response figures
+
+experiments/probes_ext.py    streaming Top-r and Mean-Max aggregators
+experiments/common.py        shared harness: streaming synth, AUROC, training loop
+experiments/exp1..exp5       real-model, ablation, drift, fragmentation, cascade
+artifacts/exp*.json          one artifact per experiment  <- backs every new claim
 
 01..05_*.py, src/            earlier mechanistic-interpretability phases
                              (SAE decomposition, ensemble subspaces)
