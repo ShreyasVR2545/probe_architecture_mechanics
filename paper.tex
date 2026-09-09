@@ -24,7 +24,7 @@
 \usepackage{microtype}
 \usepackage{titlesec}
 
-% ---- Paragraph model -------------------------------------------------------------
+% ==== Paragraph model ===============================================================
 % parskip must load AFTER the packages that set up sectioning, or its lengths get
 % overwritten. We then restate both lengths explicitly: several classes and packages
 % (amsthm and caption among them) reset \parindent locally, so relying on parskip's
@@ -241,7 +241,7 @@ gives exactly $0.000$.
 
 We note the estimator is biased: forward and backward correspond to different functions,
 so $\widetilde\Pi$ is not the gradient of any scalar. This is acceptable here because the
-bias is confined to a region the model should leave --- the update always points toward
+bias is confined to a region the model should leave, since the update always points toward
 $|z|<c$, where forward and backward agree again and the estimator becomes exact.
 
 \subsection{Dilution}
@@ -304,7 +304,7 @@ Part (ii) is what makes the theorem non-vacuous: the tolerable padding budget gr
 \emph{exponentially} in the squared signal-to-noise ratio $\Delta_h^2/\tau^2$, so at any
 fixed margin the invariance survives context growth of many orders of magnitude. Read in
 the other direction, holding $P$ fixed and asking what margin is required gives
-$\Delta_h\gtrsim\tau\sqrt{2\log(P/\delta)}$ --- the same $\sqrt{\log N}$ scale that
+$\Delta_h\gtrsim\tau\sqrt{2\log(P/\delta)}$, the same $\sqrt{\log N}$ scale that
 reappears as a cost in Remark~\ref{rem:fpr}. The two statements are one phenomenon seen
 from opposite sides: the benign maximum creeps upward like $\tau\sqrt{2\log N}$, and that
 creep is precisely what eventually overtakes a fixed incumbent.
@@ -372,9 +372,9 @@ $\partial\alpha_{j'}/\partial y_j=\alpha_j(\delta_{jj'}-\alpha_{j'})\,q/\sqrt m$
    = \alpha_j\Big[w+\tfrac{1}{\sqrt m}\big(w^\top(y_j-\bar y)\big)q\Big].
 \end{align}
 The prefactor $\alpha_j$ is strictly positive for every $j$ because the exponential is,
-so the derivative vanishes only if the bracket does, which forces $w\parallel q$ --- a
-condition confined to a Lebesgue-null subset of $(w,q)$ and, even there, satisfied only at
-the isolated $y_j$ solving the resulting scalar equation. Generically the support is all
+so the derivative vanishes only if the bracket does, which forces $w\parallel q$. That
+condition is confined to a Lebesgue-null subset of $(w,q)$ and, even there, is satisfied
+only at the isolated $y_j$ solving the resulting scalar equation. Generically the support is all
 $N$ positions.
 \end{proof}
 
@@ -446,7 +446,7 @@ carries no $\tau$ or $H$ multiplier.
 The prediction is quantitative and we confirmed it: $H\tau\log N$ at $H{=}8$, $\tau{=}1$,
 $N{=}512$ evaluates to $49.9$ against a measured $+42$, and at $N{=}16{,}384$ to $77.6$
 against a measured $+68$. The observable symptom before the fix was a recall curve
-non-monotone in signal strength ($1.00$ at $S{=}0.15$ but $0.04$ at $S{=}0.50$) --- a bug
+non-monotone in signal strength ($1.00$ at $S{=}0.15$ but $0.04$ at $S{=}0.50$), a bug
 signature rather than an effect, since no dilution mechanism improves with a weaker needle.
 \end{remark}
 
@@ -474,8 +474,8 @@ and accuracy from $0.931$ to $0.988$.
 
 \paragraph{Budget-driven thresholding.}
 A fixed $\delta$ is the wrong interface. On a well-calibrated accurate probe the genuinely
-ambiguous region is narrow, and $\delta{=}0.05$ escalated $0$ of $160$ held-out examples
---- correct behaviour, but it means a hard-coded $\delta$ silently degenerates to
+ambiguous region is narrow, and $\delta{=}0.05$ escalated $0$ of $160$ held-out examples.
+That is correct behaviour, but it means a hard-coded $\delta$ silently degenerates to
 probe-only on a good probe and to LLM-only on a bad one. Deployments have an escalation
 \emph{budget}, so we select $\delta$ as the target-rate quantile of $|\hat p-\tfrac12|$.
 Targets of $1/2/5/10\%$ land at $1.2/2.5/5.0/10.0\%$. Total system cost is
@@ -513,8 +513,8 @@ probe verdict and escalates only the ambiguous band.}
 \centering
 \includegraphics[width=\textwidth]{figures/fig2_memory_scaling.pdf}
 \caption{Left, centre: activation overhead above the input tensor, and forward latency,
-versus $N$. Right: the chunk ablation --- rows are flat in $N$ once chunking engages,
-columns rise with $C$.}
+versus $N$. Right: the chunk ablation, in which rows are flat in $N$ once chunking
+engages and columns rise with $C$.}
 \label{fig:memory}
 \end{figure}
 
@@ -545,8 +545,8 @@ is $(1,N)$. Only self-attention is quadratic.
 \begin{remark}[Is $\mathcal{O}(1)$ real, or an artifact of chunking?]
 \label{rem:complexity}
 A reviewer should press on this, and the honest answer is that the suspicion is half
-right. The flat footprint \emph{is} a consequence of streaming --- that is the mechanism,
-not an artifact --- and it obeys a measurable law. Sweeping $C\times N$
+right. The flat footprint \emph{is} a consequence of streaming (that is the mechanism,
+not an artifact), and it obeys a measurable law. Sweeping $C\times N$
 (Fig.~\ref{fig:memory}, right) gives row spread exactly $0.0$\,MiB for every $C<N$
 ($\alpha=0.000$ at $C\in\{512,2048,4096\}$ across $N$ from $8{,}192$ to $131{,}072$),
 while overhead rises with $C$ ($\beta=0.510$). For $C\ge N$ there is one chunk and the
@@ -640,7 +640,7 @@ recall $\approx0$ under a $1\%$ FPR threshold, but AUROC is $0.523$ for MultiMax
 $0.716$ for softmax: softmax keeps usable ordering after the thresholded detector has
 failed, while the hard maximum loses its signal more completely.
 
-Third --- and this is the result we least expected --- mean pooling is \emph{invariant} to
+Third, and this is the result we least expected, mean pooling is \emph{invariant} to
 fragmentation, exactly as \eqref{eq:distributed} predicts. Its AUROC moves only within
 $0.753$--$0.840$ across a $256\times$ spread of the same budget, while MultiMax falls from
 $1.000$ to $0.523$ over the same range. The aggregator that is strictly worst at $m{=}1$
@@ -648,15 +648,15 @@ $1.000$ to $0.523$ over the same range. The aggregator that is strictly worst at
 $0.523$), and the crossing is not a tie-break but a consequence of the structure: a mean
 reads accumulated deviation, which is the one functional a budget-preserving adversary
 cannot reduce. This is the sharpest evidence in the paper that our recommendation must be
-architectural rather than a claim of dominance --- and it converts the ensembling
-suggestion of \S\ref{sec:countermeasures} from speculation into a measured complementarity.
+architectural rather than a claim of dominance; it also converts the ensembling suggestion
+of \S\ref{sec:countermeasures} from speculation into a measured complementarity.
 
 % =====================================================================================
 \section{Related Work}
 % =====================================================================================
 \subsection{Mechanistic interpretability and linear probing}
 Reading a concept off intermediate representations with a trained classifier dates to
-\citet{alain2016probes}, who used probes diagnostically --- to ask what information a layer
+\citet{alain2016probes}, who used probes diagnostically, to ask what information a layer
 carries. Safety work inverted the purpose: the probe became the deployed artifact rather
 than the measurement. \citet{goldowskydill2025deception} train linear probes to flag
 strategic deception and report AUROC $0.96$--$0.999$ in distribution, while cautioning that
@@ -686,13 +686,13 @@ sharply, \citet{korznikov2026sanity} find that on sparse probing and causal edit
 dictionaries do not reliably beat random dictionaries of matched shape. The countervailing
 evidence is applied rather than benchmark-based: \citet{marks2025auditing} run a blind
 auditing game against a model trained to conceal an objective, and dictionary-based
-investigation is among the techniques that recover it --- so the tools are useful to a human
-investigator with time and hypotheses, which is a different claim from being reliable as an
-unattended monitor. It is the latter property a deployed guardrail needs.
+investigation is among the techniques that recover it. The tools are therefore useful to a
+human investigator with time and hypotheses, which is a different claim from being reliable
+as an unattended monitor. It is the latter property a deployed guardrail needs.
 
 We therefore avoid dictionary dependence entirely. The probes here read the residual stream
 directly, which forgoes feature-level interpretability but makes the memory and gradient
-analysis exact --- there is no learned basis whose quality must be separately established.
+analysis exact: there is no learned basis whose quality must be separately established.
 
 \subsection{AI control, ensembling, and monitoring protocols}
 Control protocols assume a cheap trusted monitor gating a more capable untrusted policy
@@ -701,7 +701,8 @@ untrusted monitoring across four collusion strategies and single out passive
 self-recognition, noting that such protocols need monitors whose failure modes are
 characterised rather than assumed. \citet{koran2026ensemble} show that a diverse
 three-monitor ensemble beats three identical ones by $2.4\times$ at equal compute, with low
-error-correlation the operative property --- but do not explain what makes signals diverse.
+error-correlation the operative property, but they do not explain what makes signals
+diverse.
 
 Our cascade occupies the position these protocols reserve for a low-latency first stage and
 rarely characterise. The contribution is not the routing rule, which is standard, but the
@@ -716,10 +717,10 @@ straight-through estimator is \citet{bengio2013estimating}.
 \citet{kramar2026gemini} deploy activation probes in a production assistant and report the
 finding that motivates this paper: probes fail under short-to-long distribution shift, and
 \emph{architecture choice}, not merely training data, governs whether they survive.
-\citet{chen2026longguard} give the mechanism at three layers --- attention mass on the
+\citet{chen2026longguard} give the mechanism at three layers: attention mass on the
 unsafe span is diluted, the unsafe-versus-safe logit margin compresses proportionally, and
-the detection decision collapses --- measuring a monotone recall drop of more than $50\%$
-across fifteen guardrails over a $0.25$k--$32$k span, and attributing it to proportional
+the detection decision collapses. They measure a monotone recall drop of more than $50\%$
+across fifteen guardrails over a $0.25$k--$32$k span, and attribute it to proportional
 dilution of the needle rather than to absolute length.
 
 Both stop short of an aggregation-controlled comparison with a memory law attached. Neither
@@ -735,7 +736,7 @@ specifically.
 Combining Props.~\ref{prop:mean}--\ref{prop:softmax}, Rem.~\ref{rem:sparsity} and
 \S\ref{sec:distributed}: against mean aggregation, MultiMax wins unconditionally on
 concentrated attacks. Against single-query softmax pooling the advantage is conditional
-and narrow --- $\gamma$ in Prop.~\ref{prop:softmax} is a \emph{trained} quantity, and a
+and narrow: $\gamma$ in Prop.~\ref{prop:softmax} is a \emph{trained} quantity, and a
 salient needle drives $e^{\gamma}\!\sim\!N/k$, cancelling the dilution; post-annealing
 MultiMax leads only in the weak-signal regime and ties elsewhere. Against a distributed
 adversary the two fail together, with MultiMax degrading less gracefully. The
@@ -774,7 +775,7 @@ the shape of the gap: latency differs by $1.4\times$ ($12.729$ vs $9.205$\,ms) w
 differs by $34\times$ ($652.1$ vs $19.1$\,MiB). If these kernels were arithmetic-bound the
 two ratios would track each other, because all three aggregators issue the same
 $\Theta(Nmd)$ multiply-accumulates. They do not track, which is the signature of a
-bandwidth-bound regime --- and bandwidth, not FLOPs, is what the streaming reduction buys.
+bandwidth-bound regime; bandwidth, not FLOPs, is what the streaming reduction buys.
 
 Three practical consequences. \emph{Batching.} Since overhead is $\Theta(\min(C,N))$ per
 sequence rather than $\Theta(N)$, admissible batch size at fixed memory is set by $C$, which
@@ -806,7 +807,7 @@ regime where the maximum fails. Table~\ref{tab:distributed} measures this rather
 assuming it: mean pooling holds AUROC $0.753$--$0.840$ across the full $256\times$
 fragmentation sweep and overtakes both peaked aggregators at $m{=}256$. That is
 error-decorrelation of the kind \citet{koran2026ensemble} observe, with an identified
-cause --- aggregator diversity, not model diversity --- which suggests it is the principled
+cause (aggregator diversity, not model diversity), which suggests it is the principled
 axis on which to build a monitor ensemble. The cost is reintroducing a $\Theta(N)$ member
 unless that member is itself streamed; a running mean is, so this particular pair is
 compatible with the memory law.
@@ -816,8 +817,8 @@ answers ``is any single token anomalous'' when the security question is ``is the
 anomalous mass large''. A detector reading accumulated deviation is the natural dual, and
 \eqref{eq:distributed} shows it is exactly what fragmentation leaves invariant. That
 detector is mean pooling, whose $\Theta(1/N)$ dilution is what motivated the maximum in the
-first place --- so the two failure modes are complementary rather than jointly solvable by a
-single pooled statistic. We regard this as the sharpest open problem the paper raises.
+first place. The two failure modes are therefore complementary rather than jointly solvable
+by a single pooled statistic. We regard this as the sharpest open problem the paper raises.
 
 \emph{What we can say now.} A deployment facing a fragmentation-capable adversary should not
 rely on a single pooled probe. The cascade framing already anticipates this: the appropriate
