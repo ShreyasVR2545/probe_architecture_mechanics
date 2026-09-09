@@ -54,3 +54,9 @@ Thumbs.db
 *.toc
 *.synctex.gz
 paper.log
+
+# ---- reviewer-response experiment caches (large, regenerable) ----
+artifacts/real_acts/
+artifacts/cascade_cache/
+artifacts/_offload/
+artifacts/_*.log

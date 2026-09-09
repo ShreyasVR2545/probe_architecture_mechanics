@@ -1,0 +1,164 @@
+{
+ "cells": [
+  {
+   "c": 1.0,
+   "H": 8,
+   "auroc_ood": 0.5,
+   "train_len": {
+    "N": 512,
+    "mean_raw": 1605.6241455078125,
+    "mean_abs_raw": 1605.6241455078125,
+    "max_abs_raw": 1746.614990234375,
+    "saturated_frac": 1.0
+   },
+   "eval_len": {
+    "N": 16384,
+    "mean_raw": 1605.8665771484375,
+    "mean_abs_raw": 1605.8665771484375,
+    "max_abs_raw": 1728.970703125,
+    "saturated_frac": 1.0
+   },
+   "predicted_scale_H_sqrt2logN": 35.24371926405359
+  },
+  {
+   "c": 2.0,
+   "H": 8,
+   "auroc_ood": 0.5,
+   "train_len": {
+    "N": 512,
+    "mean_raw": 344.2950744628906,
+    "mean_abs_raw": 344.2950744628906,
+    "max_abs_raw": 381.3721923828125,
+    "saturated_frac": 1.0
+   },
+   "eval_len": {
+    "N": 16384,
+    "mean_raw": 348.0544128417969,
+    "mean_abs_raw": 348.0544128417969,
+    "max_abs_raw": 391.566650390625,
+    "saturated_frac": 1.0
+   },
+   "predicted_scale_H_sqrt2logN": 35.24371926405359
+  },
+  {
+   "c": 5.0,
+   "H": 1,
+   "auroc_ood": 1.0,
+   "train_len": {
+    "N": 512,
+    "mean_raw": 3.52301287651062,
+    "mean_abs_raw": 3.52301287651062,
+    "max_abs_raw": 4.785921573638916,
+    "saturated_frac": 0.0
+   },
+   "eval_len": {
+    "N": 16384,
+    "mean_raw": 3.309178352355957,
+    "mean_abs_raw": 3.309178352355957,
+    "max_abs_raw": 4.660057544708252,
+    "saturated_frac": 0.0
+   },
+   "predicted_scale_H_sqrt2logN": 4.4054649080066985
+  },
+  {
+   "c": 5.0,
+   "H": 8,
+   "auroc_ood": 0.5,
+   "train_len": {
+    "N": 512,
+    "mean_raw": 69.87482452392578,
+    "mean_abs_raw": 69.87482452392578,
+    "max_abs_raw": 75.48638916015625,
+    "saturated_frac": 1.0
+   },
+   "eval_len": {
+    "N": 16384,
+    "mean_raw": 70.59922790527344,
+    "mean_abs_raw": 70.59922790527344,
+    "max_abs_raw": 76.36338806152344,
+    "saturated_frac": 1.0
+   },
+   "predicted_scale_H_sqrt2logN": 35.24371926405359
+  },
+  {
+   "c": 10.0,
+   "H": 1,
+   "auroc_ood": 1.0,
+   "train_len": {
+    "N": 512,
+    "mean_raw": 3.515010356903076,
+    "mean_abs_raw": 3.515010356903076,
+    "max_abs_raw": 4.780456066131592,
+    "saturated_frac": 0.0
+   },
+   "eval_len": {
+    "N": 16384,
+    "mean_raw": 3.529768228530884,
+    "mean_abs_raw": 3.529768228530884,
+    "max_abs_raw": 4.846341609954834,
+    "saturated_frac": 0.0
+   },
+   "predicted_scale_H_sqrt2logN": 4.4054649080066985
+  },
+  {
+   "c": 10.0,
+   "H": 8,
+   "auroc_ood": 1.0,
+   "train_len": {
+    "N": 512,
+    "mean_raw": 6.9229607582092285,
+    "mean_abs_raw": 6.9229607582092285,
+    "max_abs_raw": 8.251476287841797,
+    "saturated_frac": 0.0
+   },
+   "eval_len": {
+    "N": 16384,
+    "mean_raw": 7.505672454833984,
+    "mean_abs_raw": 7.505672454833984,
+    "max_abs_raw": 8.609437942504883,
+    "saturated_frac": 0.0
+   },
+   "predicted_scale_H_sqrt2logN": 35.24371926405359
+  },
+  {
+   "c": 10.0,
+   "H": 32,
+   "auroc_ood": 1.0,
+   "train_len": {
+    "N": 512,
+    "mean_raw": 7.764780044555664,
+    "mean_abs_raw": 7.764780044555664,
+    "max_abs_raw": 8.892733573913574,
+    "saturated_frac": 0.0
+   },
+   "eval_len": {
+    "N": 16384,
+    "mean_raw": 11.431817054748535,
+    "mean_abs_raw": 11.431817054748535,
+    "max_abs_raw": 12.425649642944336,
+    "saturated_frac": 1.0
+   },
+   "predicted_scale_H_sqrt2logN": 140.97487705621435
+  }
+ ],
+ "verdicts": {
+  "dead_cells_saturated_at_eval": true,
+  "live_cells_unsaturated_at_eval": false,
+  "mean_sat_frac_dead": 1.0,
+  "mean_sat_frac_live": 0.25,
+  "hypothesis": "AUROC 0.500 cells are constant-output because the pre-clamp logit leaves [-c, c] for every evaluation sequence"
+ },
+ "config": {
+  "d_model": 2048,
+  "N_train": 512,
+  "N_eval": 16384,
+  "strength": 0.15,
+  "quick": false
+ },
+ "_meta": {
+  "written": "2026-09-09T19:35:23",
+  "torch": "2.11.0+cu128",
+  "device": "NVIDIA GeForce RTX 5070 Laptop GPU",
+  "vram_total_gib": 7.95953369140625
+ }
+}
