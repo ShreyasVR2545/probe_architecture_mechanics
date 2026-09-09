@@ -113,7 +113,11 @@ $10.1$\,GiB and exhausts memory. A chunk ablation confirms the constant is chose
 free. On real Mistral-7B activations at $d{=}4096$ the same law holds: overhead is flat at
 $8.0$\,MiB from $N{=}4096$ to $131{,}072$ against $641.0$\,MiB for softmax pooling. Under a
 needle-disjoint split MultiMax also leads detection, but only narrowly (mean AUROC $0.731$
-against $0.690$ and $0.696$), and it collapses to chance at the final layer.
+against $0.690$ and $0.696$), and it collapses to chance at the final layer. On a second
+family (Qwen2.5-7B) the averaged ordering does \emph{not} hold, yet the length trend that
+motivates the paper does: softmax pooling falls from $0.947$ at $N{=}256$ to $0.661$ at
+$N{=}4096$ while the peaked reductions stay near flat, so the advantage is a long-context
+one rather than a uniform one.
 
 \vspace{0.5em}
 \noindent
@@ -123,7 +127,12 @@ training length). Annealing a \emph{normalised} Boltzmann operator
 $\tau\log(\frac1N\sum_j e^{s_j/\tau})$ to $\tau\!\to\!0$ restores $1.00$ recall; the
 normalisation is load-bearing, since plain LogSumExp injects a length-dependent
 $H\tau\log N$ offset. Calibration by Platt scaling reduces Brier from $0.0538$ to
-$0.0122$ and makes uncertainty gating usable at all.
+$0.0122$ and makes uncertainty gating usable at all. Gating on that probability is
+nevertheless inert: calibration compresses the score spread while preserving its order, so
+a budget-driven gate must be defined on \emph{rank}, which cuts the escalation tracking
+error from $0.086$ to $0.0008$. The resulting cascade over $532$ held-out prompts, with a
+deployed 2B guardrail as stage 2, reaches attack success $0.053$ against $0.496$ for
+running that guardrail on all traffic, at a quarter of the compute.
 
 \vspace{0.5em}
 \noindent
@@ -174,11 +183,21 @@ contributions:
   budget-driven thresholding is the correct interface (\S\ref{sec:cascade}), then
   instantiate stage 2 with a deployed guardrail model rather than a stand-in
   (\S\ref{sec:cascadeeval}).
-  \item \textbf{Validation on real residual streams.} Every detection claim is repeated on
-  activations read out of Mistral-7B-v0.1 at layers 16, 24 and 31. The memory law and the
-  aggregator ordering both survive; the hard maximum additionally collapses at the final
-  layer, which is a limit the synthetic setting could not have exposed
-  (\S\ref{sec:realllm}).
+  \item \textbf{Validation on real residual streams, across two model families.} Every
+  detection claim is repeated on activations read out of Mistral-7B-v0.1 and
+  Qwen2.5-7B at matched depth ratios. The memory law and the aggregator ordering both
+  survive; the hard maximum additionally collapses near the final layer, a limit the
+  synthetic setting could not have exposed (\S\ref{sec:realllm}, \S\ref{sec:qwen}).
+  \item \textbf{A Pareto frontier, and a rule for reading it.} Sweeping top-$r$ against the
+  transform width shows that $r$ is worth paying for exactly where the maximum fails:
+  it costs $0.009$ AUROC at an intermediate layer and buys $0.200$ near the final one
+  (\S\ref{sec:pareto}).
+  \item \textbf{A gate that delivers the budget it is asked for.} Gating on a calibrated
+  probability is inert, because calibration can compress the score spread while preserving
+  its order. Gating on rank instead cuts the escalation tracking error from $0.086$ to
+  $0.0008$, and the resulting cascade over $532$ held-out prompts reaches nine times fewer
+  successful attacks than a deployed 2B guardrail run on all traffic, at a quarter of the
+  compute (\S\ref{sec:cascadeeval}).
   \item \textbf{Hyperparameters chosen rather than asserted.} A $c\times H$ grid shows the
   usable region is a staircase, and a direct measurement of pre-clamp logits identifies
   saturation of both classes, not saturation as such, as the failure mode
@@ -534,6 +553,41 @@ train-to-deploy mismatch, because deployment uses the exact maximum; annealing t
 with $40\%$ of the epochs remaining lets the probe adapt to the operator it will actually
 be evaluated under. The deployed model is therefore $\tau=0$ in every number we report.
 
+\subsection{What is measured at which length, and why they differ}
+\label{sec:lengthprotocol}
+
+Two different quantities are measured over two different ranges of $N$, and conflating
+them would misrepresent both. We state the split here rather than leaving it to be
+inferred from the experiment sections.
+
+\emph{Detection is measured on real residual streams, up to $N{=}4096$.} Every AUROC we
+report for a real model comes from an actual forward pass, with real positional
+embeddings and real attention. The ceiling at $4096$ is a compute bound on this hardware
+(a $7$B model sharded across a $7.96$\,GiB GPU and host memory), not a property of the
+models: Mistral-7B-v0.1 has a $32{,}768$-token position range and Qwen2.5-7B a
+$131{,}072$-token one, so both could in principle be driven further given the machine to
+do it. We do not report detection at lengths we did not run.
+
+\emph{Memory scaling is measured to $N{=}131{,}072$, on width-matched tensors.} The
+memory ladder feeds each probe a $(N,d)$ tensor at the model's true hidden width
+($d{=}4096$ for Mistral, $d{=}3584$ for Qwen) rather than the output of a forward pass.
+This is deliberate and it is sound for the quantity being measured: a probe's activation
+footprint is determined by $(d, N, C)$ and by the reduction $\rho$, and by nothing else.
+The reduction never sees position indices, the token transform $\phi$ of \eqref{eq:phi}
+is applied per token, and no term in the memory law depends on the \emph{values} in the
+tensor. Feeding real activations instead of matched-width noise would change the numbers
+in the probe's output and leave every byte of its allocation identical.
+
+The consequence is that the two claims have different support, and we are explicit about
+which is which. The $\Theta(\min(C,N))$ memory law is established across the full
+$[128,\,131{,}072]$ range and is a statement about the aggregator. The detection ordering
+is established on real activations up to $4096$ and is a statement about the aggregator
+\emph{and} those models' representations. A reader who wants real-activation detection at
+$131{,}072$ should treat it as untested here; the length at which real detection was last
+measured is $4096$, and Table~\ref{tab:realllm} is the record of it. For Mistral,
+$N{=}2^{17}$ additionally exceeds the model's native position range outright, so real
+residuals at that length do not exist to be measured.
+
 \subsection{Calibration and the cascading gate}
 \label{sec:cascade}
 % =====================================================================================
@@ -673,9 +727,11 @@ reaches $0.759$. We read this as the final-layer residual stream being dominated
 next-token prediction structure, in which the single most extreme coordinate along a
 learned direction is a poor summary of a diffuse property like intent. This is a concrete,
 model-side instance of the limit the paper argues for throughout: the hard maximum is the
-right reduction when evidence is concentrated and the wrong one when it is spread. It also
-gives a deployment rule that costs nothing to follow, namely to site the probe mid-stack
-rather than at the final layer.
+right reduction when evidence is concentrated and the wrong one when it is spread. It
+suggests siting the probe mid-stack rather than at the final layer. We qualify that
+suggestion in \S\ref{sec:qwen}: the \emph{collapse} does not reproduce on Qwen2.5-7B, so
+it is a fact about this model rather than about depth in general, even though the weaker
+preference for mid-stack holds on both.
 
 \subsection{Batched systems scaling}
 \label{sec:batched}
@@ -980,6 +1036,148 @@ positive one about the estimator: the failure Remark~\ref{rem:clamp} identifies 
 structural, arising from the derivative $\mathbb{1}[|z|<c]$ rather than from rounding, so
 it cannot be escaped by changing dtype and does not need to be.
 
+\subsection{A second model family: Qwen2.5-7B}
+\label{sec:qwen}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_qwen_family.pdf}
+\caption{Qwen2.5-7B. (a) Detection AUROC by depth ratio, averaged over
+$N\in\{256,1024,4096\}$. (b) Activation overhead at Qwen's width $d{=}3584$: MultiMax and
+Top-$r$ are flat at $8.0$\,MiB to $N{=}131{,}072$ while softmax pooling reaches
+$641.0$\,MiB.}
+\label{fig:qwen}
+\end{figure}
+
+A single model cannot separate "a property of the reduction" from "a property of
+Mistral's residual stream". We repeat the comparison on Qwen2.5-7B: a different family,
+28 layers against 32, $d{=}3584$ against $4096$, a different tokeniser and corpus.
+Gemma-7B was the first choice and \texttt{google/gemma-7b} returns HTTP 403 for our
+account, as does \texttt{google/gemma-2-9b}. Layers are selected by \emph{depth ratio}
+($50\%$, $75\%$, $100\%$, giving 13, 20, 27 of 28) rather than by index, since comparing
+layer 16 across models of different depth would confound depth with family.
+
+\begin{table}[!ht]
+\centering\small
+\begin{tabular}{lcccc}
+\toprule
+& \multicolumn{3}{c}{mean AUROC at context length $N$} & \\
+\cmidrule(lr){2-4}
+probe & $256$ & $1024$ & $4096$ & mean\\
+\midrule
+MultiMax (ours)   & $0.835$ & $0.843$ & $0.774$ & $0.817$\\
+Top-$r$ ($r{=}8$) & $0.904$ & $0.860$ & $\mathbf{0.814}$ & $\mathbf{0.859}$\\
+Softmax attention & $\mathbf{0.947}$ & $\mathbf{0.892}$ & $0.661$ & $0.833$\\
+Mean pooling      & $0.901$ & $0.725$ & $0.619$ & $0.748$\\
+\bottomrule
+\end{tabular}
+\caption{Qwen2.5-7B, averaged over the three depths, needle-disjoint split. Softmax
+pooling is best at short context and worst at long; the two peaked reductions are close to
+flat. The averaged column hides the crossover, which is the point of reporting the
+lengths separately.}
+\label{tab:qwen}
+\end{table}
+
+\paragraph{The ordering does not transfer; the mechanism does.} Averaged over everything,
+MultiMax does \emph{not} beat softmax pooling on Qwen ($0.817$ against $0.833$), so the
+headline comparison from \S\ref{sec:realllm} is not a general fact about aggregation.
+Stated that baldly it is a negative result and we report it as one. But the average is the
+wrong statistic, and looking at the length axis shows why. Softmax pooling falls from
+$0.947$ at $N{=}256$ to $0.661$ at $N{=}4096$, a loss of $0.286$; MultiMax moves from
+$0.835$ to $0.774$ and Top-$r$ from $0.904$ to $0.814$. The crossover sits between
+$N{=}1024$ and $N{=}4096$, and past it both peaked reductions lead. This is precisely the
+dilution mechanism the paper is about (Prop.~\ref{prop:softmax}), now reproduced on a
+second family: query-based pooling has the better representation at short context and
+loses it as the context grows, while a maximum keeps what it has. Our claim is a
+long-context claim, and it survives; a claim of uniform superiority would not have.
+
+\paragraph{Top-$r$ generalises better than the plain maximum.} On Qwen the best aggregator
+at every length is Top-$r$ or softmax, never the plain maximum, and Top-$r$ takes the
+overall mean ($0.859$). Together with \S\ref{sec:pareto}, where $r$ buys $0.200$ AUROC
+near the final layer, this is consistent evidence that $r{>}1$ should be the default and
+$r{=}1$ the special case, which inverts the emphasis of the original paper.
+
+\paragraph{A rule we stated too strongly.} \S\ref{sec:realllm} concluded from Mistral that
+the probe should be sited mid-stack rather than at the final layer, where MultiMax
+collapsed to $0.535$. On Qwen the same probe at $100\%$ depth reaches $0.773$, well above
+chance, so the \emph{collapse} is Mistral-specific rather than general. The weaker
+direction of the rule does hold on both models, in that $75\%$ depth beats $100\%$
+($0.859$ against $0.773$ here), so mid-stack remains the better default. We have narrowed
+the claim to what two models support.
+
+\paragraph{The memory law is unchanged.} At Qwen's width the MultiMax and Top-$r$ overhead
+is flat at $8.0$\,MiB from $N{=}4096$ to $131{,}072$ while softmax pooling rises to
+$641.0$\,MiB, numerically identical to the Mistral measurement. That is expected rather
+than surprising: the overhead is a function of the chunk width $C$, the transform width
+$m$ and the reduction, and the model's hidden size $d$ enters only the input tensor, which
+the serving stack already holds. It is worth stating because it makes the systems claim
+model-independent in a way the detection claim is not.
+
+\subsection{The accuracy-memory Pareto frontier over $r$, $m$ and depth}
+\label{sec:pareto}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_pareto_top_r.pdf}
+\caption{AUROC against activation overhead over the $r\times m$ grid on real Mistral-7B
+residuals at $N{=}1024$, needle-disjoint split, with the Pareto front dashed. Panel (c)
+isolates the effect of $r$: at the intermediate layer it buys nothing, and near the final
+layer it is worth $0.20$ AUROC.}
+\label{fig:pareto}
+\end{figure}
+
+The two parameters that trade detection against footprint are the top-$r$ width and the
+transform width $m$ of \eqref{eq:phi}; $r$ sets the carried state at $\Theta(rH)$ and $m$
+sets the per-chunk activation. We sweep $r\in\{1,2,4,8,16,32\}$ against
+$m\in\{16,32,64,128,256\}$ at two depths, $30$ configurations per depth, measuring AUROC
+on cached real residuals and overhead at $N{=}16{,}384$.
+
+\begin{table}[!ht]
+\centering\small
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{6}{c}{top-$r$}\\
+\cmidrule(lr){2-7}
+$m$ (overhead) & $1$ & $2$ & $4$ & $8$ & $16$ & $32$\\
+\midrule
+\multicolumn{7}{l}{\emph{layer 16, intermediate}}\\
+$16$ \ ($0.25$\,MiB)  & $0.828$ & $\mathbf{0.884}$ & $0.856$ & $0.816$ & $0.806$ & $0.821$\\
+$32$ \ ($0.50$\,MiB)  & $0.835$ & $\mathbf{0.905}$ & $0.826$ & $0.859$ & $0.839$ & $0.835$\\
+$128$ ($2.00$\,MiB)   & $\mathbf{0.906}$ & $0.885$ & $0.898$ & $0.891$ & $0.880$ & $0.878$\\
+\midrule
+\multicolumn{7}{l}{\emph{layer 31, near-final}}\\
+$16$ \ ($0.25$\,MiB)  & $0.540$ & $0.408$ & $0.599$ & $0.615$ & $0.611$ & $\mathbf{0.653}$\\
+$32$ \ ($0.50$\,MiB)  & $0.431$ & $0.552$ & $0.488$ & $0.557$ & $0.713$ & $\mathbf{0.802}$\\
+$128$ ($2.00$\,MiB)   & $0.499$ & $0.493$ & $0.499$ & $0.646$ & $0.628$ & $\mathbf{0.705}$\\
+\bottomrule
+\end{tabular}
+\caption{AUROC over the $(r,m)$ grid at two depths, real Mistral-7B residuals,
+$N{=}1024$. Overhead depends on $m$ and is independent of $r$ to within $0.005$\,MiB,
+because the carried $\Theta(rH)$ buffer is negligible beside the per-chunk transform
+output. Bold marks the best $r$ in each row. Rows $m{=}64$ and $m{=}256$ are omitted for
+space and are in the artifact.}
+\label{tab:pareto}
+\end{table}
+
+\paragraph{Depth decides whether $r$ is worth paying for.} Averaged over $m$, moving from
+$r{=}1$ to $r{=}32$ changes AUROC by $-0.009$ at layer 16 ($0.840$ to $0.831$) and by
+$+0.200$ at layer 31 ($0.516$ to $0.715$). The sign flips. This is the same mechanism the
+paper argues from throughout, now visible as a design rule rather than as a limitation:
+mid-stack the evidence for harmful intent is concentrated in a few positions, so a single
+maximum captures it and averaging more positions only admits noise; near the final layer
+the evidence is diffuse, the single maximum is close to useless ($0.516$, barely above
+chance), and averaging the top $32$ recovers most of what is there. Top-$r$ is not a
+uniform improvement on the maximum. It is the correct reduction exactly where the maximum
+is the wrong one, which is a more useful statement than a win on an average.
+
+\paragraph{The frontier is cheap.} At layer 16 the best configuration overall is
+$(r{=}1,m{=}128)$ at $0.906$ AUROC for $2.00$\,MiB, but $(r{=}2,m{=}32)$ reaches $0.905$
+for $0.50$\,MiB. That is a quarter of the memory for a difference of $0.001$ AUROC, which
+is far inside the noise of a $48$-sequence evaluation. The frontier is flat in exactly the
+region a deployment cares about, so the honest recommendation is the cheap corner:
+$m{=}32$, $r{=}2$ at an intermediate layer. Our defaults elsewhere in the paper
+($m{=}512$, $r{=}1$) are conservative by comparison, and this sweep says so.
+
 % =====================================================================================
 \section{Adversarial Fragmentation and Cascades}
 \label{sec:adversarial}
@@ -1152,46 +1350,90 @@ rather than a parsed string.
 \centering\small
 \begin{tabular}{lccccc}
 \toprule
-operating point & escalated & AUROC & ASR & FLOPs vs.\ always-on & latency\\
+operating point & escalated & AUROC & ASR & FPR & FLOPs vs.\ always-on & latency\\
 \midrule
-probe only                     & $0.000$ & $0.554$ & $0.500$ & $0.0010$ & $0.37$\,ms\\
-cascade, $50\%$ budget         & $0.500$ & $0.625$ & $\mathbf{0.208}$ & $0.5005$
-                               & $798$\,ms\\
-SGuard on everything           & $1.000$ & $\mathbf{0.997}$ & $0.333$ & $1.0000$
-                               & $1595$\,ms\\
+probe only                & $0.000$ & $0.948$ & $0.256$ & $0.004$ & $0.0010$
+                          & $0.37$\,ms\\
+cascade, $5\%$ budget     & $0.051$ & $0.963$ & $0.207$ & $0.004$ & $0.0517$
+                          & $81.7$\,ms\\
+cascade, $25\%$ budget    & $0.250$ & $0.992$ & $\mathbf{0.053}$ & $0.004$ & $0.2508$
+                          & $401.1$\,ms\\
+SGuard on everything      & $1.000$ & $\mathbf{0.998}$ & $0.496$ & $0.000$ & $1.0000$
+                          & $1603.3$\,ms\\
 \bottomrule
 \end{tabular}
-\caption{End-to-end cascade against a real stage 2, $N{=}512$, 48 held-out sequences.
-ASR is the fraction of harmful sequences the composed system fails to flag. Escalation
-budgets below $50\%$ are omitted because they escalate nothing; see the text.}
+\caption{End-to-end cascade against a real stage 2 under rank gating, $N{=}512$, $532$
+held-out prompts ($266$ harmful, $266$ benign) from disjoint corpora. ASR is the fraction
+of harmful prompts the composed system fails to flag.}
 \label{tab:cascade}
 \end{table}
 
+\paragraph{Scale and corpus.} Prompts are real rather than templated: $416$ harmful
+behaviours from an AdvBench derivative and a length-matched sample of benign instructions
+from Alpaca, split prompt-disjointly into $300$ for training the probe and $532$ for
+evaluation. Stage 1 reaches AUROC $0.950$ on this corpus, against the $0.554$ of our
+earlier $n{=}48$ attempt; the difference is the corpus, not the method, and it is the
+reason that attempt could not support a conclusion.
+
 \paragraph{The economics are as claimed.} A stage-1 pass costs $0.104\%$ of a stage-2 pass
-in FLOPs and $0.37$\,ms against $1595$\,ms in measured latency, a factor of about $4300$.
-That gap is the entire reason to build a cascade, and it is larger than the paper's cost
-model assumed.
+in FLOPs, and $0.367$\,ms against $1602.9$\,ms measured, a factor of about $4400$. That
+gap is the entire reason to build a cascade.
 
-\paragraph{The gate, at this stage-1 quality, does not work.} Every escalation budget from
-$1\%$ to $25\%$ escalates \emph{nothing}. The cause is visible in the fitted Platt
-parameters: $a=95.9$ maps almost every logit to $\hat p\in\{0,1\}$, so $|\hat p-\frac12|$
-is near $\frac12$ everywhere and no quantile of it produces a usable band. A weak stage 1
-is not merely a weak detector; it destroys the uncertainty signal the gate depends on.
-This is a failure mode \S\ref{sec:cascade} did not anticipate, and it is a direct
-consequence of stage 1's AUROC being $0.554$ here, far below the $0.917$ it reaches at
-layer 16 in Table~\ref{tab:realllm}. We report the cascade at the configuration we
-actually measured rather than at the probe's best layer.
+\paragraph{Three of the four gating rules do not work, and not for the reason we thought.}
+Our earlier diagnosis blamed a degenerate Platt fit ($a{=}95.9$) caused by a weak stage 1.
+That was wrong. Here stage 1 is strong and Platt fits $a{=}6.30$, and the gate is still
+inert: it escalates \emph{exactly nothing} at every budget from $1\%$ to $25\%$.
+Table~\ref{tab:gates} reports the quantity that matters, the mean absolute gap between the
+requested escalation budget and the realised one.
 
-\paragraph{An unexpected complementarity.} At a $50\%$ budget the composed system reaches
-an attack success rate of $0.208$, \emph{better} than running SGuard on all traffic
-($0.333$) at half the compute. That is not a rounding artifact: SGuard itself misses a
-third of these attacks, because a single harmful sentence buried in benign filler is
-exactly the long-context dilution failure \citet{chen2026longguard} document, and some of
-the sequences it misses are ones the probe catches. The two stages fail on partly disjoint
-inputs. We are wary of over-reading a result at $n{=}48$ with a weak stage 1, and state it
-as a hypothesis worth testing properly rather than as a headline: a cascade may be worth
-building for coverage as well as for cost, because a cheap monitor with different failure
-modes is not merely a cheaper version of the expensive one.
+\begin{table}[!ht]
+\centering\small
+\begin{tabular}{lcccl}
+\toprule
+gating rule & realised @ $5\%$ & realised @ $25\%$ & tracking error & failure mode\\
+\midrule
+Platt $|\hat p-\frac12|$        & $0.000$ & $0.000$ & $0.0860$
+  & inert: $\hat p$ saturates to $\{0,1\}$\\
+Temperature ($T{=}1.45$)        & $0.051$ & $0.056$ & $0.0492$
+  & saturates above $\approx5.6\%$\\
+Isotonic                        & $0.008$ & $0.008$ & $0.0785$
+  & plateaus collapse the quantiles\\
+\textbf{Rank}                   & $\mathbf{0.051}$ & $\mathbf{0.250}$ & $\mathbf{0.0008}$
+  & none observed\\
+\bottomrule
+\end{tabular}
+\caption{Escalation budget requested against escalation realised. Tracking error is the
+mean of $|\text{realised}-\text{target}|$ over targets $\{1,2,5,10,25\}\%$. Only the
+rank rule delivers the budget it is asked for.}
+\label{tab:gates}
+\end{table}
+
+The common cause is that all three parametric rules gate on a \emph{probability spread},
+$|\hat p-\frac12|$, and calibration is free to compress that spread to nothing while
+leaving the score \emph{ordering} untouched. Platt saturates it, isotonic replaces it with
+step plateaus so that quantiles land on ties, and temperature scaling narrows the usable
+band to about $5.6\%$ of traffic and cannot be pushed past it. The fix is to gate on the
+ordering instead: escalate the middle $q$-quantile of the \emph{ranks} of $z$. This is
+exact by construction and immune to any monotone reparameterisation of the score, and it
+reduces the tracking error by two orders of magnitude, from $0.0860$ to $0.0008$. We
+regard this as the correct interface for a budget-driven gate and a correction to
+\S\ref{sec:cascade}, which specified the band on $|\hat p-\frac12|$.
+
+\paragraph{The complementarity is real, and larger than we guessed.} With a working gate
+the composed system at a $25\%$ budget reaches ASR $0.053$ against $0.496$ for running
+SGuard on every request: nine times fewer successful attacks at one quarter of the
+compute and one quarter of the latency. The mechanism is that SGuard misses almost half of
+these attacks on its own, which is the long-context dilution failure
+\citet{chen2026longguard} document, arriving here as a single harmful sentence buried in
+benign filler. The probe catches many of the ones it misses. At $n{=}48$ we flagged this
+as a hypothesis; at $n{=}532$ with a prompt-disjoint split and a real corpus we state it as
+a result. A cheap monitor with different failure modes is not a cheaper version of the
+expensive one, and the cascade is worth building for coverage before cost.
+
+One caveat we will not smooth over: SGuard is being used outside its design point. It is
+built to classify a prompt-response pair, and we hand it a $512$-token filler passage with
+one sentence hidden in it. The $0.496$ ASR is a statement about that setting, not a general
+verdict on the model.
 
 % =====================================================================================
 \section{Related Work and Discussion}

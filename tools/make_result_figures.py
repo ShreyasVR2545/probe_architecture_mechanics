@@ -276,9 +276,108 @@ def fig_mixed_frag():
     save(fig, "fig_mixed_fragmentation")
 
 
+# ======================================================================================
+def fig_pareto_top_r():
+    """AUROC against activation memory over the (r, m) grid, one panel per depth."""
+    d = load("exp6_pareto.json")
+    if d is None:
+        return
+    g = d["grid"]
+    layers = sorted({r["layer"] for r in g})
+    ms = sorted({r["m"] for r in g})
+    rs = sorted({r["r"] for r in g})
+    fig, axes = plt.subplots(1, len(layers) + 1, figsize=(7.8, 2.9),
+                             gridspec_kw={"width_ratios": [1] * len(layers) + [0.9]})
+
+    cmap = plt.get_cmap("viridis")
+    for ax, L in zip(axes, layers):
+        for j, m in enumerate(ms):
+            sub = sorted([x for x in g if x["layer"] == L and x["m"] == m],
+                         key=lambda x: x["r"])
+            if not sub:
+                continue
+            ax.plot([x["overhead_mib"] for x in sub], [x["auroc"] for x in sub],
+                    "o-", ms=3.2, lw=1.1, color=cmap(j / max(len(ms) - 1, 1)),
+                    label=rf"$m={m}$")
+        front = d["verdicts"]["pareto_front_by_layer"][str(L)]
+        ax.plot([p["overhead_mib"] for p in front], [p["auroc"] for p in front],
+                "k--", lw=1.4, zorder=5, label="Pareto front")
+        ax.axhline(0.5, color="0.35", lw=0.8, ls=":")
+        ax.set_xscale("log")
+        ax.set_xlabel("activation overhead (MiB)")
+        ax.set_ylabel("AUROC")
+        depth = "intermediate" if L == min(layers) else "near-final"
+        ax.set_title(f"(layer {L}, {depth})")
+        ax.set_ylim(0.42, 1.0)
+    axes[0].legend(frameon=False, fontsize=6.8, loc="lower right", ncol=2)
+
+    # the r effect, isolated: it is depth that decides whether r matters
+    ax = axes[-1]
+    for L, style in zip(layers, ("o-", "s--")):
+        best = []
+        for r_ in rs:
+            v = [x["auroc"] for x in g if x["layer"] == L and x["r"] == r_]
+            best.append(max(v) if v else np.nan)
+        ax.plot(rs, best, style, ms=3.4, lw=1.3, label=f"layer {L}")
+    ax.set_xscale("log", base=2)
+    ax.set_xlabel(r"top-$r$")
+    ax.set_ylabel(r"best AUROC over $m$")
+    ax.set_title(r"(c) where $r$ earns its cost")
+    ax.legend(frameon=False, fontsize=7.5)
+    fig.tight_layout()
+    save(fig, "fig_pareto_top_r")
+
+
+# ======================================================================================
+def fig_qwen_family():
+    d = load("exp8_qwen_family.json")
+    if d is None:
+        return
+    det, sysrows = d["detection"], [r for r in d["systems"] if not r.get("oom")]
+    fig, axes = plt.subplots(1, 2, figsize=(7.4, 3.0))
+
+    ax = axes[0]
+    ratios = sorted({r["depth_ratio"] for r in det})
+    probes = sorted({r["probe"] for r in det})
+    w = 0.8 / len(probes)
+    x = np.arange(len(ratios), dtype=float)
+    for i, kind in enumerate(probes):
+        vals = [float(np.mean([r["auroc"] for r in det
+                               if r["depth_ratio"] == rho and r["probe"] == kind]) or 0)
+                for rho in ratios]
+        ax.bar(x + i * w - 0.4 + w / 2, vals, w * 0.92,
+               color=C.get(kind, "0.4"), label=LBL.get(kind, kind))
+    ax.axhline(0.5, color="0.35", lw=0.9, ls="--")
+    ax.set_xticks(x)
+    ax.set_xticklabels([f"{rho:.0%} depth" for rho in ratios])
+    ax.set_ylabel(r"AUROC (mean over $N$)")
+    ax.set_ylim(0.35, 1.02)
+    ax.set_title("(a) Qwen2.5-7B detection by depth")
+    # No legend here: placed lower-left it sat on top of the 50%-depth bars. Both panels
+    # use the same colours, so the one in (b) serves both.
+
+    ax = axes[1]
+    for kind in probes:
+        rs = sorted([r for r in sysrows if r["probe"] == kind], key=lambda r: r["N"])
+        if not rs:
+            continue
+        ax.plot([r["N"] for r in rs], [r["peak_overhead_mib"] for r in rs], "o-",
+                color=C.get(kind, "0.4"), label=LBL.get(kind, kind), ms=3.5, lw=1.3)
+    ax.set_xscale("log", base=2)
+    ax.set_yscale("log")
+    ax.set_xlabel(r"context length $N$")
+    ax.set_ylabel("activation overhead (MiB)")
+    ax.set_title(r"(b) memory at Qwen width $d{=}3584$")
+    ax.legend(frameon=False, fontsize=7, loc="upper left")
+    fig.tight_layout()
+    save(fig, "fig_qwen_family")
+
+
 if __name__ == "__main__":
     fig_real_llm()
     fig_ablation()
     fig_drift_cal()
     fig_mixed_frag()
+    fig_pareto_top_r()
+    fig_qwen_family()
     print("result figures done")

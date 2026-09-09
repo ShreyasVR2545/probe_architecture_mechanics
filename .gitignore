@@ -60,3 +60,6 @@ artifacts/real_acts/
 artifacts/cascade_cache/
 artifacts/_offload/
 artifacts/_*.log
+artifacts/qwen_acts/
+artifacts/cascade500/
+artifacts/_offload_qwen/

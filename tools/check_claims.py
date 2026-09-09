@@ -292,29 +292,142 @@ def main() -> int:
                            and f"{b16['softmax_attn']['latency_ms']:.2f}" == "320.57"
                            and has("92.68") and has("320.57"), ""))
 
+    # exp5 is SUPERSEDED by exp7 (n=48 -> n=532, templated prompts -> real corpora), so
+    # the paper no longer quotes its figures. Its checks therefore verify only that the
+    # artifact is self-consistent, NOT that the numbers appear in the prose: requiring
+    # that would fail the moment a superseded result is correctly removed from the paper.
     e5 = art("exp5_cascade.json")
     if e5:
         v = e5["verdicts"]
-        checks.append(("E5 stage1 AUROC 0.554",
-                       f"{v['stage1_auroc']:.3f}" == "0.554" and has("0.554"), ""))
-        checks.append(("E5 stage2 AUROC 0.997",
-                       f"{v['stage2_auroc']:.3f}" == "0.997" and has("0.997"), ""))
-        checks.append(("E5 stage2 is a real model",
+        checks.append(("E5 (superseded) stage1 AUROC 0.554",
+                       f"{v['stage1_auroc']:.3f}" == "0.554", ""))
+        checks.append(("E5 (superseded) stage2 is a real model",
                        "SGuard" in v["stage2_is_real_model"], v["stage2_is_real_model"]))
-        checks.append(("E5 ASR always-stage2 0.333",
-                       f"{v['asr_always_stage2']:.3f}" == "0.333" and has("0.333"), ""))
-        mid = [r for r in e5["cascade"] if abs(r["escalation_rate"] - 0.5) < 1e-6]
-        if mid:
-            checks.append(("E5 cascade ASR at 50% budget 0.208",
-                           f"{mid[0]['attack_success_rate']:.3f}" == "0.208"
-                           and has("0.208"), f"artifact {mid[0]['attack_success_rate']}"))
-        checks.append(("E5 stage1/stage2 FLOPs ratio 0.104%",
+        checks.append(("E5 (superseded) FLOPs ratio 0.104%",
                        f"{v['flops_ratio_stage1_to_stage2'] * 100:.3f}" == "0.104"
                        and has("0.104"), f"{v['flops_ratio_stage1_to_stage2']:.6f}"))
-        checks.append(("E5 latencies 0.37 ms and 1595 ms",
-                       f"{v['stage1_latency_ms']:.2f}" == "0.37"
-                       and f"{v['stage2_latency_ms']:.0f}" == "1595"
-                       and has("0.37") and has("1595"), ""))
+        checks.append(("E5 superseded by E7 at larger n",
+                       art("exp7_cascade_scaled.json") is not None
+                       and art("exp7_cascade_scaled.json")["verdicts"]["n_eval"]
+                       > v["n_test"], ""))
+
+    e6 = art("exp6_pareto.json")
+    if e6:
+        g6 = e6["grid"]
+
+        def mean_r(layer, r_):
+            v = [x["auroc"] for x in g6 if x["layer"] == layer and x["r"] == r_]
+            return sum(v) / len(v) if v else None
+        for L, want in ((16, "-0.009"), (31, "+0.200")):
+            d_ = mean_r(L, 32) - mean_r(L, 1)
+            checks.append((f"E6 layer-{L} r=1->32 delta {want}",
+                           f"{d_:+.3f}" == want and has(want.lstrip('+')),
+                           f"artifact {d_:+.4f}"))
+        for L, r_, want in ((16, 1, "0.840"), (16, 32, "0.831"),
+                            (31, 1, "0.516"), (31, 32, "0.715")):
+            v = mean_r(L, r_)
+            checks.append((f"E6 mean AUROC L{L} r={r_} = {want}",
+                           f"{v:.3f}" == want and has(want), f"artifact {v:.4f}"))
+        # overhead must depend on m and NOT on r; the paper says within 0.005 MiB
+        spread = []
+        for m_ in {x["m"] for x in g6}:
+            v = [x["overhead_mib"] for x in g6 if x["m"] == m_]
+            spread.append(max(v) - min(v))
+        checks.append(("E6 overhead independent of r (<0.005 MiB)",
+                       max(spread) < 0.005 and has("0.005"),
+                       f"max spread {max(spread):.5f} MiB"))
+        cheap = [x for x in g6 if x["layer"] == 16 and x["r"] == 2 and x["m"] == 32]
+        rich = [x for x in g6 if x["layer"] == 16 and x["r"] == 1 and x["m"] == 128]
+        if cheap and rich:
+            checks.append(("E6 cheap corner 0.905 @0.50 vs 0.906 @2.00 MiB",
+                           f"{cheap[0]['auroc']:.3f}" == "0.905"
+                           and f"{rich[0]['auroc']:.3f}" == "0.906"
+                           and has("0.905") and has("0.906"), ""))
+
+    e7 = art("exp7_cascade_scaled.json")
+    if e7:
+        v = e7["verdicts"]
+        checks.append(("E7 evaluation set >= 500 prompts", v["n_eval"] >= 500,
+                       f"n_eval={v['n_eval']}"))
+        checks.append(("E7 corpus is real, not templated",
+                       "harmful_behaviors" in v["corpus"]["harmful"]
+                       and "alpaca" in v["corpus"]["benign"], str(v["corpus"])))
+        checks.append(("E7 prompt-disjoint split",
+                       v["corpus"]["split"] == "prompt-disjoint", ""))
+        # the paper's claim about WHICH gates are inert must match the artifact
+        for rule, inert in v["gate_inert"].items():
+            checks.append((f"E7 gate '{rule}' inert = {inert}", isinstance(inert, bool),
+                           ""))
+        checks.append(("E7 rank gate is never inert",
+                       v["gate_inert"]["rank"] is False, ""))
+        checks.append(("E7 stage1 AUROC 0.950 / stage2 0.998",
+                       f"{v['stage1_auroc']:.3f}" == "0.950"
+                       and f"{v['stage2_auroc']:.3f}" == "0.998"
+                       and has("0.950") and has("0.998"), ""))
+        checks.append(("E7 platt a=6.30 (not degenerate)",
+                       f"{v['platt_a']:.2f}" == "6.30" and has("6.30"),
+                       f"artifact {v['platt_a']:.4f}"))
+        te = v["escalation_tracking_error"]
+        for rule, want in (("platt", "0.0860"), ("temperature", "0.0492"),
+                           ("isotonic", "0.0785"), ("rank", "0.0008")):
+            checks.append((f"E7 tracking error {rule} = {want}",
+                           f"{te[rule]:.4f}" == want and has(want),
+                           f"artifact {te[rule]:.5f}"))
+        r25 = v["realised_at_target_25pct"]
+        checks.append(("E7 platt realises 0.000 at a 25% budget",
+                       abs(r25["platt"]) < 1e-9, f"{r25['platt']}"))
+        checks.append(("E7 rank realises 0.250 at a 25% budget",
+                       f"{r25['rank']:.3f}" == "0.250", f"{r25['rank']}"))
+        row25 = [r for r in e7["cascade"] if r["rule"] == "rank"
+                 and abs(r["target_rate"] - 0.25) < 1e-9]
+        if row25:
+            checks.append(("E7 cascade ASR 0.053 at 25% budget",
+                           f"{row25[0]['attack_success_rate']:.3f}" == "0.053"
+                           and has("0.053"), f"{row25[0]['attack_success_rate']}"))
+        checks.append(("E7 always-stage2 ASR 0.496",
+                       f"{v['asr_always_stage2']:.3f}" == "0.496" and has("0.496"), ""))
+
+    e8 = art("exp8_qwen_family.json")
+    if e8:
+        v = e8["verdicts"]
+        checks.append(("E8 second family is Qwen2.5", "Qwen2.5" in v["model"],
+                       v["model"]))
+        checks.append(("E8 gemma gated recorded", v["gemma_gated_403"] is True, ""))
+        checks.append(("E8 depth ratios 50/75/100",
+                       v["depth_ratios"] == [0.5, 0.75, 1.0], str(v["depth_ratios"])))
+        mm, sm = v["mean_auroc"]["multimax"], v["mean_auroc"]["softmax_attn"]
+        # The paper says plainly that MultiMax does NOT beat softmax on Qwen's average.
+        # If a rerun flipped that, the prose would be wrong, so assert the direction.
+        checks.append(("E8 multimax does NOT beat softmax on average (paper says so)",
+                       v["multimax_beats_softmax"] is False,
+                       f"multimax {mm:.4f}, softmax {sm:.4f}"))
+        for kind, want in (("multimax", "0.817"), ("topr", "0.859"),
+                           ("softmax_attn", "0.833"), ("mean_pool", "0.748")):
+            checks.append((f"E8 mean AUROC {kind} = {want}",
+                           f"{v['mean_auroc'][kind]:.3f}" == want and has(want),
+                           f"artifact {v['mean_auroc'][kind]:.4f}"))
+        det8 = e8["detection"]
+
+        def m8(N, kind):
+            z = [r["auroc"] for r in det8 if r["N"] == N and r["probe"] == kind]
+            return sum(z) / len(z) if z else None
+        for N, kind, want in ((256, "softmax_attn", "0.947"),
+                              (4096, "softmax_attn", "0.661"),
+                              (256, "multimax", "0.835"), (4096, "multimax", "0.774"),
+                              (4096, "topr", "0.814")):
+            got = m8(N, kind)
+            checks.append((f"E8 mean AUROC {kind}@N={N} = {want}",
+                           f"{got:.3f}" == want and has(want), f"artifact {got:.4f}"))
+        checks.append(("E8 memory law unchanged (8.0 flat, 641.0 softmax)",
+                       f"{v['multimax_overhead_mib']:.1f}" == "8.0"
+                       and f"{v['softmax_overhead_at_max_N']:.1f}" == "641.0"
+                       and v["multimax_overhead_flat"] is True, ""))
+        # the near-final collapse must NOT reproduce, which is what the paper claims
+        mm100 = [r["auroc"] for r in det8
+                 if r["depth_ratio"] == 1.0 and r["probe"] == "multimax"]
+        checks.append(("E8 no final-layer collapse on Qwen (0.773)",
+                       f"{sum(mm100) / len(mm100):.3f}" == "0.773" and has("0.773"),
+                       f"artifact {sum(mm100) / len(mm100):.4f}"))
 
     width = max(len(c[0]) for c in checks)
     npass = 0

@@ -1,0 +1,483 @@
+{
+ "detection": [
+  {
+   "N": 256,
+   "layer": 13,
+   "depth_ratio": 0.5,
+   "probe": "multimax",
+   "auroc": 0.866319477558136,
+   "recall_at_1pct_fpr": 0.4166666865348816
+  },
+  {
+   "N": 256,
+   "layer": 13,
+   "depth_ratio": 0.5,
+   "probe": "topr",
+   "auroc": 0.9427083134651184,
+   "recall_at_1pct_fpr": 0.7083333730697632
+  },
+  {
+   "N": 256,
+   "layer": 13,
+   "depth_ratio": 0.5,
+   "probe": "softmax_attn",
+   "auroc": 0.9704861044883728,
+   "recall_at_1pct_fpr": 0.8333333730697632
+  },
+  {
+   "N": 256,
+   "layer": 13,
+   "depth_ratio": 0.5,
+   "probe": "mean_pool",
+   "auroc": 0.9079861044883728,
+   "recall_at_1pct_fpr": 0.2916666865348816
+  },
+  {
+   "N": 256,
+   "layer": 20,
+   "depth_ratio": 0.75,
+   "probe": "multimax",
+   "auroc": 0.9253472089767456,
+   "recall_at_1pct_fpr": 0.8333333730697632
+  },
+  {
+   "N": 256,
+   "layer": 20,
+   "depth_ratio": 0.75,
+   "probe": "topr",
+   "auroc": 0.9722222089767456,
+   "recall_at_1pct_fpr": 0.8333333730697632
+  },
+  {
+   "N": 256,
+   "layer": 20,
+   "depth_ratio": 0.75,
+   "probe": "softmax_attn",
+   "auroc": 0.9409722089767456,
+   "recall_at_1pct_fpr": 0.875
+  },
+  {
+   "N": 256,
+   "layer": 20,
+   "depth_ratio": 0.75,
+   "probe": "mean_pool",
+   "auroc": 0.9548611044883728,
+   "recall_at_1pct_fpr": 0.625
+  },
+  {
+   "N": 256,
+   "layer": 27,
+   "depth_ratio": 1.0,
+   "probe": "multimax",
+   "auroc": 0.7135416865348816,
+   "recall_at_1pct_fpr": 0.2916666865348816
+  },
+  {
+   "N": 256,
+   "layer": 27,
+   "depth_ratio": 1.0,
+   "probe": "topr",
+   "auroc": 0.796875,
+   "recall_at_1pct_fpr": 0.0
+  },
+  {
+   "N": 256,
+   "layer": 27,
+   "depth_ratio": 1.0,
+   "probe": "softmax_attn",
+   "auroc": 0.928819477558136,
+   "recall_at_1pct_fpr": 0.7083333730697632
+  },
+  {
+   "N": 256,
+   "layer": 27,
+   "depth_ratio": 1.0,
+   "probe": "mean_pool",
+   "auroc": 0.8402777910232544,
+   "recall_at_1pct_fpr": 0.1666666716337204
+  },
+  {
+   "N": 1024,
+   "layer": 13,
+   "depth_ratio": 0.5,
+   "probe": "multimax",
+   "auroc": 0.8532986044883728,
+   "recall_at_1pct_fpr": 0.5833333730697632
+  },
+  {
+   "N": 1024,
+   "layer": 13,
+   "depth_ratio": 0.5,
+   "probe": "topr",
+   "auroc": 0.8446180820465088,
+   "recall_at_1pct_fpr": 0.6666666865348816
+  },
+  {
+   "N": 1024,
+   "layer": 13,
+   "depth_ratio": 0.5,
+   "probe": "softmax_attn",
+   "auroc": 0.8723958134651184,
+   "recall_at_1pct_fpr": 0.7083333730697632
+  },
+  {
+   "N": 1024,
+   "layer": 13,
+   "depth_ratio": 0.5,
+   "probe": "mean_pool",
+   "auroc": 0.7282986044883728,
+   "recall_at_1pct_fpr": 0.1666666716337204
+  },
+  {
+   "N": 1024,
+   "layer": 20,
+   "depth_ratio": 0.75,
+   "probe": "multimax",
+   "auroc": 0.8472222089767456,
+   "recall_at_1pct_fpr": 0.75
+  },
+  {
+   "N": 1024,
+   "layer": 20,
+   "depth_ratio": 0.75,
+   "probe": "topr",
+   "auroc": 0.8689236044883728,
+   "recall_at_1pct_fpr": 0.75
+  },
+  {
+   "N": 1024,
+   "layer": 20,
+   "depth_ratio": 0.75,
+   "probe": "softmax_attn",
+   "auroc": 0.9609375,
+   "recall_at_1pct_fpr": 0.7916666865348816
+  },
+  {
+   "N": 1024,
+   "layer": 20,
+   "depth_ratio": 0.75,
+   "probe": "mean_pool",
+   "auroc": 0.7439236044883728,
+   "recall_at_1pct_fpr": 0.375
+  },
+  {
+   "N": 1024,
+   "layer": 27,
+   "depth_ratio": 1.0,
+   "probe": "multimax",
+   "auroc": 0.8298611044883728,
+   "recall_at_1pct_fpr": 0.6666666865348816
+  },
+  {
+   "N": 1024,
+   "layer": 27,
+   "depth_ratio": 1.0,
+   "probe": "topr",
+   "auroc": 0.8671875,
+   "recall_at_1pct_fpr": 0.7083333730697632
+  },
+  {
+   "N": 1024,
+   "layer": 27,
+   "depth_ratio": 1.0,
+   "probe": "softmax_attn",
+   "auroc": 0.842881977558136,
+   "recall_at_1pct_fpr": 0.7083333730697632
+  },
+  {
+   "N": 1024,
+   "layer": 27,
+   "depth_ratio": 1.0,
+   "probe": "mean_pool",
+   "auroc": 0.702256977558136,
+   "recall_at_1pct_fpr": 0.2916666865348816
+  },
+  {
+   "N": 4096,
+   "layer": 13,
+   "depth_ratio": 0.5,
+   "probe": "multimax",
+   "auroc": 0.7395833134651184,
+   "recall_at_1pct_fpr": 0.375
+  },
+  {
+   "N": 4096,
+   "layer": 13,
+   "depth_ratio": 0.5,
+   "probe": "topr",
+   "auroc": 0.8315972089767456,
+   "recall_at_1pct_fpr": 0.5416666865348816
+  },
+  {
+   "N": 4096,
+   "layer": 13,
+   "depth_ratio": 0.5,
+   "probe": "softmax_attn",
+   "auroc": 0.703125,
+   "recall_at_1pct_fpr": 0.0833333358168602
+  },
+  {
+   "N": 4096,
+   "layer": 13,
+   "depth_ratio": 0.5,
+   "probe": "mean_pool",
+   "auroc": 0.6284722089767456,
+   "recall_at_1pct_fpr": 0.0833333358168602
+  },
+  {
+   "N": 4096,
+   "layer": 20,
+   "depth_ratio": 0.75,
+   "probe": "multimax",
+   "auroc": 0.8055555820465088,
+   "recall_at_1pct_fpr": 0.625
+  },
+  {
+   "N": 4096,
+   "layer": 20,
+   "depth_ratio": 0.75,
+   "probe": "topr",
+   "auroc": 0.8020833134651184,
+   "recall_at_1pct_fpr": 0.75
+  },
+  {
+   "N": 4096,
+   "layer": 20,
+   "depth_ratio": 0.75,
+   "probe": "softmax_attn",
+   "auroc": 0.6736111044883728,
+   "recall_at_1pct_fpr": 0.2083333432674408
+  },
+  {
+   "N": 4096,
+   "layer": 20,
+   "depth_ratio": 0.75,
+   "probe": "mean_pool",
+   "auroc": 0.6076388955116272,
+   "recall_at_1pct_fpr": 0.1666666716337204
+  },
+  {
+   "N": 4096,
+   "layer": 27,
+   "depth_ratio": 1.0,
+   "probe": "multimax",
+   "auroc": 0.7760416865348816,
+   "recall_at_1pct_fpr": 0.5833333730697632
+  },
+  {
+   "N": 4096,
+   "layer": 27,
+   "depth_ratio": 1.0,
+   "probe": "topr",
+   "auroc": 0.8090277910232544,
+   "recall_at_1pct_fpr": 0.5
+  },
+  {
+   "N": 4096,
+   "layer": 27,
+   "depth_ratio": 1.0,
+   "probe": "softmax_attn",
+   "auroc": 0.6076388955116272,
+   "recall_at_1pct_fpr": 0.0416666679084301
+  },
+  {
+   "N": 4096,
+   "layer": 27,
+   "depth_ratio": 1.0,
+   "probe": "mean_pool",
+   "auroc": 0.6215277910232544,
+   "recall_at_1pct_fpr": 0.0
+  }
+ ],
+ "systems": [
+  {
+   "N": 4096,
+   "probe": "multimax",
+   "d_model": 3584,
+   "input_mib": 28.0,
+   "peak_overhead_mib": 8.00048828125,
+   "latency_ms": 0.9639999916544184,
+   "oom": false
+  },
+  {
+   "N": 4096,
+   "probe": "topr",
+   "d_model": 3584,
+   "input_mib": 28.0,
+   "peak_overhead_mib": 8.00048828125,
+   "latency_ms": 0.8967000030679628,
+   "oom": false
+  },
+  {
+   "N": 4096,
+   "probe": "softmax_attn",
+   "d_model": 3584,
+   "input_mib": 28.0,
+   "peak_overhead_mib": 28.03369140625,
+   "latency_ms": 0.6588999967789277,
+   "oom": false
+  },
+  {
+   "N": 4096,
+   "probe": "mean_pool",
+   "d_model": 3584,
+   "input_mib": 28.0,
+   "peak_overhead_mib": 24.00439453125,
+   "latency_ms": 0.9135000000242144,
+   "oom": false
+  },
+  {
+   "N": 16384,
+   "probe": "multimax",
+   "d_model": 3584,
+   "input_mib": 112.0,
+   "peak_overhead_mib": 8.0009765625,
+   "latency_ms": 2.5261999981012195,
+   "oom": false
+  },
+  {
+   "N": 16384,
+   "probe": "topr",
+   "d_model": 3584,
+   "input_mib": 112.0,
+   "peak_overhead_mib": 8.00048828125,
+   "latency_ms": 2.134399997885339,
+   "oom": false
+  },
+  {
+   "N": 16384,
+   "probe": "softmax_attn",
+   "d_model": 3584,
+   "input_mib": 112.0,
+   "peak_overhead_mib": 80.125,
+   "latency_ms": 2.4372000043513253,
+   "oom": false
+  },
+  {
+   "N": 16384,
+   "probe": "mean_pool",
+   "d_model": 3584,
+   "input_mib": 112.0,
+   "peak_overhead_mib": 24.00439453125,
+   "latency_ms": 1.8863000004785135,
+   "oom": false
+  },
+  {
+   "N": 65536,
+   "probe": "multimax",
+   "d_model": 3584,
+   "input_mib": 448.0,
+   "peak_overhead_mib": 8.0009765625,
+   "latency_ms": 7.006300002103671,
+   "oom": false
+  },
+  {
+   "N": 65536,
+   "probe": "topr",
+   "d_model": 3584,
+   "input_mib": 448.0,
+   "peak_overhead_mib": 8.00048828125,
+   "latency_ms": 7.473099991329946,
+   "oom": false
+  },
+  {
+   "N": 65536,
+   "probe": "softmax_attn",
+   "d_model": 3584,
+   "input_mib": 448.0,
+   "peak_overhead_mib": 320.5,
+   "latency_ms": 9.162400005152449,
+   "oom": false
+  },
+  {
+   "N": 65536,
+   "probe": "mean_pool",
+   "d_model": 3584,
+   "input_mib": 448.0,
+   "peak_overhead_mib": 24.00439453125,
+   "latency_ms": 7.015399998635985,
+   "oom": false
+  },
+  {
+   "N": 131072,
+   "probe": "multimax",
+   "d_model": 3584,
+   "input_mib": 896.0,
+   "peak_overhead_mib": 8.0009765625,
+   "latency_ms": 13.956200011307374,
+   "oom": false
+  },
+  {
+   "N": 131072,
+   "probe": "topr",
+   "d_model": 3584,
+   "input_mib": 896.0,
+   "peak_overhead_mib": 8.00048828125,
+   "latency_ms": 14.540700009092689,
+   "oom": false
+  },
+  {
+   "N": 131072,
+   "probe": "softmax_attn",
+   "d_model": 3584,
+   "input_mib": 896.0,
+   "peak_overhead_mib": 641.0,
+   "latency_ms": 18.273800000315532,
+   "oom": false
+  },
+  {
+   "N": 131072,
+   "probe": "mean_pool",
+   "d_model": 3584,
+   "input_mib": 896.0,
+   "peak_overhead_mib": 24.00439453125,
+   "latency_ms": 14.32570000179112,
+   "oom": false
+  }
+ ],
+ "verdicts": {
+  "model": "Qwen/Qwen2.5-7B",
+  "family": "Qwen2.5",
+  "n_layers": 28,
+  "d_model": 3584,
+  "native_context": 131072,
+  "gemma_gated_403": true,
+  "depth_ratios": [
+   0.5,
+   0.75,
+   1.0
+  ],
+  "layers_used": [
+   13,
+   20,
+   27
+  ],
+  "mean_auroc": {
+   "multimax": 0.8174189858966403,
+   "topr": 0.8594714469379849,
+   "softmax_attn": 0.8334297868940566,
+   "mean_pool": 0.7483603424496121
+  },
+  "multimax_beats_softmax": false,
+  "multimax_overhead_flat": true,
+  "multimax_overhead_mib": 8.00048828125,
+  "softmax_overhead_at_max_N": 641.0
+ },
+ "config": {
+  "model": "Qwen/Qwen2.5-7B",
+  "n_per_class": 48,
+  "epochs": 10,
+  "Ns": [
+   256,
+   1024,
+   4096
+  ],
+  "quick": false
+ },
+ "_meta": {
+  "written": "2026-09-09T22:46:27",
+  "torch": "2.11.0+cu128",
+  "device": "NVIDIA GeForce RTX 5070 Laptop GPU",
+  "vram_total_gib": 7.95953369140625
+ }
+}
