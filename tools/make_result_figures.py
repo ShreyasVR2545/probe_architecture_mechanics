@@ -139,18 +139,18 @@ def fig_real_llm():
             rs = [r["auroc"] for r in det if r["layer"] == L and r["probe"] == kind]
             vals.append(float(np.mean(rs)) if rs else np.nan)
         ax.bar(x + i * w - 0.4 + w / 2, vals, w * 0.92, color=C[kind], label=LBL[kind])
-    ax.axhline(0.5, color="0.35", lw=0.9, ls="--", zorder=1)
-    # 'chance' sits in the gap BETWEEN the layer-24 and layer-31 bar groups, just above
-    # the dashed line. Both edges of the axis are occupied: the left by the y-axis, the
-    # right by the tallest layer-31 bar, so an interior gap is the only clean anchor.
-    ax.text(1.5, 0.525, "chance", fontsize=7.2, color="0.35", ha="center", va="bottom")
+    # The dashed line is identified in the LEGEND rather than by a floating text label.
+    # Every in-axes position for that word touched either a bar, the line itself or the
+    # y-axis, because the bars span the full width and the line spans it too. A legend
+    # entry costs no plot area and cannot collide with anything.
+    ax.axhline(0.5, color="0.35", lw=0.9, ls="--", zorder=1, label="chance (0.5)")
     ax.set_xticks(x)
     ax.set_xticklabels([f"layer {L}" for L in layers])
     ax.set_ylabel("AUROC (mean over $N$)")
     # Headroom above the tallest bar (0.86) so the legend band never meets the data.
-    ax.set_ylim(0.35, 1.30)
+    ax.set_ylim(0.35, 1.42)
     ax.set_title("(b) detection on real residuals")
-    legend(ax, loc="upper right", bbox_to_anchor=(1.0, 1.02), ncol=1, fontsize=6.6)
+    legend(ax, loc="upper center", ncol=2, fontsize=6.4, columnspacing=1.0)
     fig.tight_layout()
     save(fig, "fig_real_llm_performance")
 
@@ -351,13 +351,13 @@ def fig_mixed_frag():
     # Five entries will not fit inside (a) without covering the mean-pooling curve and
     # the chance line, which is where they were. Panel (b) is nearly empty between 0.4
     # and 0.7, so the shared legend goes there and costs no extra figure height.
-    # Shared legend in the open middle band of (b): the two series there sit at 1.00 and
-    # around 0.75, leaving 0.40-0.68 empty across the full width. 'lower center' put it
-    # on the chance line and against the frame.
-    axes[1].set_ylim(0.30, 1.06)
+    # Shared legend BELOW the whole row, spanning all five entries in one line. Inside
+    # panel (b) the five-entry box was wide enough to overhang the y-axis spine, and no
+    # interior anchor fits it; a figure-level legend cannot cross an axis at all.
     handles, labels = axes[0].get_legend_handles_labels()
-    style_frame(axes[1].legend(handles, labels, loc="center", bbox_to_anchor=(0.5, 0.26),
-                               ncol=2, fontsize=6.3, columnspacing=1.0, **LEG))
+    style_frame(fig.legend(handles, labels, loc="lower center",
+                           bbox_to_anchor=(0.5, -0.055), ncol=5, fontsize=6.6,
+                           columnspacing=1.2, **LEG))
 
     ax = axes[2]
     bt = [r for r in d["batched"] if not r.get("oom")]

@@ -524,7 +524,7 @@ selected by the ablation of \S\ref{sec:ablation} rather than asserted.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_arch_multimax.pdf}
+\includegraphics[width=0.94\textwidth]{figures/fig_arch_multimax.pdf}
 \caption{The streaming MultiMax pipeline. Chunks of $C$ tokens enter one at a time; the
 token transform $\phi$ and the head projection are applied within a chunk and discarded,
 and the only quantity that crosses a chunk boundary is the $(B,H)$ buffer of running
@@ -677,7 +677,7 @@ contaminates the comparison.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_real_llm_performance.pdf}
+\includegraphics[width=0.95\textwidth]{figures/fig_real_llm_performance.pdf}
 \caption{Mistral-7B-v0.1 residual streams. (a) Activation overhead at the model's true
 width $d{=}4096$: MultiMax is flat at $8.0$\,MiB from $N{=}4096$ to $131{,}072$, a
 $32\times$ increase in length at zero increase in footprint, while softmax pooling rises
@@ -816,7 +816,7 @@ fitting comfortably and the kernel starts paying for it.
 \label{sec:systems}
 \begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig2_memory_scaling.pdf}
+\includegraphics[width=0.95\textwidth]{figures/fig2_memory_scaling.pdf}
 \caption{Left, centre: activation overhead above the input tensor, and forward latency,
 versus $N$. Right: the chunk ablation, in which rows are flat in $N$ once chunking
 engages and columns rise with $C$.}
@@ -896,7 +896,7 @@ Fig.~\ref{fig:anneal} is the entire contribution of \S\ref{sec:annealing}.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_drift_and_calibration.pdf}
+\includegraphics[width=0.95\textwidth]{figures/fig_drift_and_calibration.pdf}
 \caption{(a) The offset between unnormalised and normalised LogSumExp, against the closed
 form $H\tau\log N$. (b) The benign maximum against $\sqrt{\log N}$, with the least-squares
 fit and the asymptotic prediction. (c) Brier score at each evaluation length under a
@@ -941,7 +941,7 @@ separation, but we no longer present it as an empirically forced choice.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_ablation_grid.pdf}
+\includegraphics[width=0.95\textwidth]{figures/fig_ablation_grid.pdf}
 \caption{(a) Out-of-distribution AUROC over the $c\times H$ grid: probes train at
 $N{=}512$ and are scored at $N{=}16{,}384$. The usable region is a staircase, and the
 $c$ required grows with $H$. (b) Coefficient of variation of the gradient norm across
@@ -1076,7 +1076,7 @@ it cannot be escaped by changing dtype and does not need to be.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_qwen_family.pdf}
+\includegraphics[width=0.95\textwidth]{figures/fig_qwen_family.pdf}
 \caption{Qwen2.5-7B. (a) Detection AUROC by depth ratio, averaged over
 $N\in\{256,1024,4096\}$. (b) Activation overhead at Qwen's width $d{=}3584$: MultiMax and
 Top-$r$ are flat at $8.0$\,MiB to $N{=}131{,}072$ while softmax pooling reaches
@@ -1153,7 +1153,7 @@ model-independent in a way the detection claim is not.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_pareto_top_r.pdf}
+\includegraphics[width=0.95\textwidth]{figures/fig_pareto_top_r.pdf}
 \caption{AUROC against activation overhead over the $r\times m$ grid on real Mistral-7B
 residuals at $N{=}1024$, needle-disjoint split, with the Pareto front dashed. Panel (c)
 isolates the effect of $r$: at the intermediate layer it buys nothing, and near the final
@@ -1293,7 +1293,7 @@ of \S\ref{sec:countermeasures} from speculation into a measured complementarity.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_mixed_fragmentation.pdf}
+\includegraphics[width=0.95\textwidth]{figures/fig_mixed_fragmentation.pdf}
 \caption{(a) AUROC against fragmentation width under an unknown-$m$ protocol: probes train
 on a mixture $m\in\{1,8,64\}$ and are evaluated at held-out widths. (b) The mixed
 adversary, which retains a concentrated core carrying half the budget. (c) Per-sequence
@@ -1365,7 +1365,7 @@ maximum considerably more than \S\ref{sec:distributed} suggested.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.92\textwidth]{figures/fig_cascade_pipeline.pdf}
+\includegraphics[width=0.86\textwidth]{figures/fig_cascade_pipeline.pdf}
 \caption{The evaluated cascade. Stage 1 is a MultiMax probe over Mistral-7B residuals,
 Platt-calibrated and gated on $|\hat p-\frac12|<\delta$; stage 2 is
 SGuard-ContentFilter-2B, run in full. Escalated traffic pays the stage-2 cost, confident

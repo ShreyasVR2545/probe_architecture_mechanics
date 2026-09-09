@@ -93,7 +93,8 @@ background patches in the figure code.
 |---|---|---|
 | 1 architecture | caption sat in the corridor swept by the two dotted expansion lines; `residual stream` crowded chunk 1 | caption moved into a band opened inside the container; label given its own column, feed arrow shortened |
 | 1 architecture | carried-state box met the stage row; feedback label struck by dashes | box and container floor lowered, feedback run shortened at both ends |
-| 2 real residuals (b) | legend over the layer-24/31 bars and the chance line | legend to upper right with 30% headroom; `chance` moved into the inter-group gap |
+| 1 architecture | the two mechanism boxes punched through the dashed container floor | their `y` is now derived from the measured box height, `py0 - h - 0.42`, so the gap holds whatever the text does |
+| 2 real residuals (b) | legend over the layer-24/31 bars; the `chance` label collided wherever it was placed | legend to upper centre, two columns; the dashed line is now identified by a **legend entry** instead of a floating label, so it cannot collide at all |
 | 3 systems scaling (a) | `OOM` text on the arms of the X marker | lifted 14 pt via `xytext` offset |
 | 4 annealing (a) | legend hid the mean-pooling curve entirely | ceiling raised, legend above the flat recall curves |
 | 5 drift (b) | legend crossed both trajectories | moved to the empty upper-left, `ylim` extended |
@@ -102,13 +103,16 @@ background patches in the figure code.
 | 6 ablation (c) | `0.000` labels detached and colliding | short labels lifted above the bar pair, 52% headroom, legend above |
 | 8 Pareto (a, c) | legends straddling the chance line and the layer-16 trajectory | (a) lower left below all points; (c) band opened above both curves |
 | 9 fragmentation (b) | `AUROC gap` callout on the data line | offset in points, left and down |
-| 10 mixed (b, c) | 5-entry legend covering curves; (c) legend on the MultiMax curve | shared legend into the empty middle band of (b); (c) band opened above both curves |
-| 11 cascade | `yes`/`no` cut by the destination box outlines | connector gap widened, labels re-anchored into that gap |
+| 10 mixed (b, c) | 5-entry legend overhung the y-axis spine of (b); (c) legend on the MultiMax curve | shared legend moved **below the whole row** as a figure-level legend, which cannot cross an axis; (c) band opened above both curves |
+| 11 cascade | `yes`/`no` cut by the destination box outlines, then by their own connectors | offset **perpendicular** to each arc, on the side the curve bends away from |
 
 Global: `axes.axisbelow=True` so grid lines sit strictly behind data; one legend style
 everywhere (white, 90% opaque, `#cccccc` rounded frame); `bbox_inches='tight'` with
 `pad_inches=0.05`, since the gap to the text block is supplied by the LaTeX float
 spacing and baking it into the image as well double-counts it.
+
+Figure widths are trimmed to `0.95	extwidth` (schematics to 0.94 and 0.86), inside the
+5-8% band, which is what pulls the references off an orphan final page.
 
 One deliberate exception: `tight_layout()` is **not** called on the two schematics or on
 `fig1_architecture`. Those have their axes switched off and size every box by measuring

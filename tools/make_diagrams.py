@@ -215,11 +215,16 @@ def fig_arch_multimax() -> None:
     t2 = ("straight-through clamp (bounded link)\n"
           r"forward $\Pi_{[-c,c]}(z)$,   backward $\equiv 1$")
     mech_cols = [(PALE["yellow"], ORANGE), (PALE["orange"], ORANGE)]
-    mxs, mw, mh, mrow_w = c.row([t1, t2], 0.05, 8.0, mech_cols,
+    # Placed BELOW the dashed container with a real gap, derived from the measured box
+    # height rather than a fixed y. At a hard-coded y=0.05 these two boxes were tall
+    # enough to punch through the container's bottom edge.
+    mech_h = max(c.fit_h(t1, 8.0), c.fit_h(t2, 8.0))
+    mech_y = py0 - mech_h - 0.42
+    mxs, mw, mh, mrow_w = c.row([t1, t2], mech_y, 8.0, mech_cols,
                                 PX0 + max(0.0, (PW - 2 * 5.0 - 0.45)) / 2, gap=0.45)
-    c.arrow((xs[2] + bw / 2, row_y), (mxs[0] + mw * 0.55, 0.05 + mh),
+    c.arrow((xs[2] + bw / 2, row_y), (mxs[0] + mw * 0.55, mech_y + mh),
             color=ORANGE, lw=1.0, ls=(0, (3, 2)), rad=0.20)
-    c.arrow((sx + sw, sy + sh / 2), (mxs[1] + mw * 0.55, 0.05 + mh),
+    c.arrow((sx + sw, sy + sh / 2), (mxs[1] + mw * 0.55, mech_y + mh),
             color=ORANGE, lw=1.0, ls=(0, (3, 2)), rad=-0.20)
 
     c.save("fig_arch_multimax")
@@ -262,20 +267,25 @@ def fig_cascade_pipeline() -> None:
     # widened to 1.05 and each label is anchored just inside the gate side of it, so the
     # label occupies clear canvas between the gate and its destination box. No white
     # background patch is used anywhere in this diagram.
+    # Each label is offset PERPENDICULAR to its connector, on the side the arc bends
+    # away from. A positive rad bows the curve up and left, so "no" goes below and right
+    # of the chord midpoint; a negative rad bows down and left, so "yes" goes above and
+    # right. Anchored near the arc's start the labels lay along the curve itself.
     hok = c.fit_h(t_ok, 8.2)
     ok_y = row_y + h + 0.46
     c.box(rx, ok_y, rw, t_ok, PALE["green"], GREEN, fs=8.2, h=hok)
-    c.arrow((gate_r, mid + h * 0.20), (rx, ok_y + hok / 2), color=GREEN, lw=1.4, rad=0.18)
-    ax.text(gate_r + 0.24, mid + h * 0.20 + 0.46, "no", fontsize=8.2, color=GREEN,
-            weight="bold", ha="left", va="bottom", zorder=6)
+    a_ok, b_ok = (gate_r, mid + h * 0.20), (rx, ok_y + hok / 2)
+    c.arrow(a_ok, b_ok, color=GREEN, lw=1.4, rad=0.18)
+    ax.text((a_ok[0] + b_ok[0]) / 2 + 0.16, (a_ok[1] + b_ok[1]) / 2 - 0.34, "no",
+            fontsize=8.2, color=GREEN, weight="bold", ha="left", va="top", zorder=6)
 
     hesc = c.fit_h(t_esc, 8.2, "bold")
     esc_y = row_y - hesc - 0.50
     c.box(rx, esc_y, rw, t_esc, PALE["orange"], ORANGE, fs=8.2, weight="bold", h=hesc)
-    c.arrow((gate_r, mid - h * 0.20), (rx, esc_y + hesc / 2), color=ORANGE, lw=1.4,
-            rad=-0.18)
-    ax.text(gate_r + 0.24, mid - h * 0.20 - 0.46, "yes", fontsize=8.2, color=ORANGE,
-            weight="bold", ha="left", va="top", zorder=6)
+    a_es, b_es = (gate_r, mid - h * 0.20), (rx, esc_y + hesc / 2)
+    c.arrow(a_es, b_es, color=ORANGE, lw=1.4, rad=-0.18)
+    ax.text((a_es[0] + b_es[0]) / 2 + 0.16, (a_es[1] + b_es[1]) / 2 + 0.34, "yes",
+            fontsize=8.2, color=ORANGE, weight="bold", ha="left", va="bottom", zorder=6)
 
     total_w = rx + rw - PX0
     ax.text(PX0 + total_w / 2, 6.52,
