@@ -1,7 +1,194 @@
 Rc files read (in order):
   NONE
 Latexmk: This is Latexmk, John Collins, 9 March 2026. Version 4.88.
-Latexmk: Nothing to do for 'paper.tex'.
+Latexmk: applying rule 'pdflatex'...
+Rule 'pdflatex':  Reasons for rerun
+Changed files or newly in use/created:
+  paper.tex
+Category 'changed_user':
+  paper.tex
+
+------------
+Run number 1 of rule 'pdflatex'
+------------
+------------
+Running 'pdflatex  -interaction=nonstopmode -halt-on-error -recorder  "paper.tex"'
+------------
+This is pdfTeX, Version 3.141592653-2.6-1.40.28 (MiKTeX 25.12) (preloaded format=pdflatex.fmt)
+ restricted \write18 enabled.
+entering extended mode
+(paper.tex
+LaTeX2e <2025-11-01>
+L3 programming layer <2025-12-24>
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/base\article.cls
+Document Class: article 2025/01/22 v1.4n Standard LaTeX document class
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/base\size10.clo))
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/lm\lmodern.sty)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/base\fontenc.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/lm\t1lmr.fd))
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/geometry\geometry.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/graphics\keyval.sty)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/generic/iftex\ifvtex.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/generic/iftex\iftex.sty))
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/geometry\geometry.cfg
+))
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/amsmath\amsmath.sty
+For additional information on amsmath, use the `?' option.
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/amsmath\amstext.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/amsmath\amsgen.sty))
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/amsmath\amsbsy.sty)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/amsmath\amsopn.sty))
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\amssymb.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\amsfonts.sty
+)) (C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/amscls\amsthm.sty)
+
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/mathtools\mathtools.s
+ty (C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/tools\calc.sty)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/mathtools\mhsetup.sty
+))
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/booktabs\booktabs.sty
+)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/graphics\graphicx.sty
+
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/graphics\graphics.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/graphics\trig.sty)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/graphics-cfg\graphics
+.cfg)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/graphics-def\pdftex.d
+ef)))
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/xcolor\xcolor.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/graphics-cfg\color.cf
+g)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/graphics\mathcolor.lt
+x)) (C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/natbib\natbib.sty
+)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/hyperref\hyperref.sty
+
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/kvsetkeys\kvsetkeys.s
+ty)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/generic/kvdefinekeys\kvdefi
+nekeys.sty)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/generic/pdfescape\pdfescape
+.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/generic/ltxcmds\ltxcmds.sty
+)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/generic/pdftexcmds\pdftexcm
+ds.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/generic/infwarerr\infwarerr
+.sty)))
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/hycolor\hycolor.sty)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/hyperref\nameref.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/refcount\refcount.sty
+)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/generic/gettitlestring\gett
+itlestring.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/kvoptions\kvoptions.s
+ty)))
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/etoolbox\etoolbox.sty
+)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/generic/stringenc\stringenc
+.sty)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/hyperref\pd1enc.def)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/generic/intcalc\intcalc.sty
+) (C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/hyperref\puenc.def)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/url\url.sty)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/generic/bitset\bitset.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/generic/bigintcalc\bigintca
+lc.sty)))
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/hyperref\hpdftex.def
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/rerunfilecheck\rerunf
+ilecheck.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/generic/uniquecounter\uniqu
+ecounter.sty)))
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/caption\caption.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/caption\caption3.sty)
+)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/microtype\microtype.s
+ty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/microtype\microtype-p
+dftex.def)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/microtype\microtype.c
+fg))
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/titlesec\titlesec.sty
+) (C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/parskip\parskip.sty
+)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/l3backend\l3backend-p
+dftex.def) (paper.aux)
+*geometry* driver: auto-detecting
+*geometry* detected driver: pdftex
+
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/context/base/mkii\supp-pdf.
+mkii
+[Loading MPS to PDF converter (version 2006.09.02).]
+)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/epstopdf-pkg\epstopdf
+-base.sty
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/00miktex\epstopdf-sys
+.cfg)) (paper.out) (paper.out)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/microtype\mt-cmr.cfg)
+
+Couldn't patch \deferred@thm@head!
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/lm\ot1lmr.fd)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/lm\omllmm.fd)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/lm\omslmsy.fd)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/lm\omxlmex.fd)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsa.fd)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/microtype\mt-msa.cfg)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/amsfonts\umsb.fd)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/microtype\mt-msb.cfg)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/lm\t1lmtt.fd)
+(C:\Users\Shreyas\AppData\Local\Programs\MiKTeX\tex/latex/lm\ts1lmr.fd)
+[1{C:/Users/Shreyas/AppData/Local/MiKTeX/fonts/map/pdftex/pdftex.map}{C:/Users/
+Shreyas/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-ec.enc}{C:/Users/Sh
+reyas/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-mathsy.enc}{C:/Users/
+Shreyas/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-rm.enc}{C:/Users/Sh
+reyas/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-mathit.enc}{C:/Users/
+Shreyas/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-mathex.enc}{C:/User
+s/Shreyas/AppData/Local/Programs/MiKTeX/fonts/enc/dvips/lm/lm-ts1.enc}]
+[2] [3] [4] [5 <./figures/fig1_architecture.pdf>] [6 <./figures/fig2_memory_sca
+ling.pdf>] [7 <./figures/fig3_annealing_recall.pdf>] [8 <./figures/fig4_distrib
+uted_attack.pdf>] [9] (paper.bbl [10]) [11] (paper.aux) )<C:/Users/Shreyas/AppD
+ata/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx10.pfb><C:/Users/Shreyas/Ap
+pData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx12.pfb><C:/Users/Shreyas/
+AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmbx9.pfb><C:/Users/Shreyas
+/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmex10.pfb><C:/Users/Shrey
+as/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi10.pfb><C:/Users/Shr
+eyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi5.pfb><C:/Users/Sh
+reyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi6.pfb><C:/Users/S
+hreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi7.pfb><C:/Users/
+Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmmi9.pfb><C:/Users
+/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr10.pfb><C:/User
+s/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr12.pfb><C:/Use
+rs/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr6.pfb><C:/Use
+rs/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr7.pfb><C:/Use
+rs/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmr9.pfb><C:/Use
+rs/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmri10.pfb><C:/U
+sers/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmri7.pfb><C:/
+Users/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmri9.pfb><C:
+/Users/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy10.pfb><
+C:/Users/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy5.pfb>
+<C:/Users/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy6.pfb
+><C:/Users/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy7.pf
+b><C:/Users/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmsy9.p
+fb><C:/Users/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/lm/lmtt10
+.pfb><C:/Users/Shreyas/AppData/Local/Programs/MiKTeX/fonts/type1/public/amsfont
+s/symbols/msbm10.pfb>
+Output written on paper.pdf (11 pages, 658017 bytes).
+Transcript written on paper.log.
+pdflatex: major issue: So far, you have not checked for MiKTeX updates.
+Latexmk: Getting log file 'paper.log'
+Latexmk: Examining 'paper.fls'
+Latexmk: Examining 'paper.log'
+Latexmk: Found input bbl file 'paper.bbl'
+Latexmk: Found input bbl file 'paper.bbl'
+Latexmk: Found input bbl file 'paper.bbl'
+Latexmk: Log file says output to 'paper.pdf'
+Latexmk: Using bibtex to make bibliography file(s).
+  ===Source file 'paper.bbl' for 'pdflatex'
+kpsewhich: major issue: So far, you have not checked for MiKTeX updates.
+kpsewhich: major issue: So far, you have not checked for MiKTeX updates.
+Latexmk: Found bibliography file(s):
+  ./references.bib
 Latexmk: All targets (paper.pdf) are up-to-date
 
 latexmk: major issue: So far, you have not checked for MiKTeX updates.
