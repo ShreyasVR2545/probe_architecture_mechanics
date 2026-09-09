@@ -14,6 +14,7 @@
 
 \usepackage[letterpaper,margin=1in]{geometry}
 \usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{enumitem}   % (\roman*) labels inside Theorem 2.5
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage{xcolor}
@@ -45,6 +46,16 @@
 \titlespacing*{\subsubsection}{0pt}{9pt plus 1.5pt minus 1.5pt}{4pt plus 1pt}
 \titlespacing*{\paragraph}    {0pt}{7pt plus 1pt minus 1pt}{6pt}
 
+% parskip zeroes amsthm's \topsep, which leaves theorem headers butting directly against
+% the preceding paragraph and indistinguishable from body text. amsthm exposes this hook
+% for exactly that purpose; restoring the skips is what makes the results scannable.
+\makeatletter
+\def\thm@space@setup{%
+  \thm@preskip=6pt plus 2pt minus 2pt
+  \thm@postskip=\thm@preskip
+}
+\makeatother
+
 \theoremstyle{plain}
 \newtheorem{theorem}{Theorem}[section]
 \newtheorem{proposition}[theorem]{Proposition}
@@ -61,9 +72,8 @@
 \newcommand{\sg}{\operatorname{sg}}
 \captionsetup{font=small,labelfont=bf}
 
-\title{\textbf{Max Duty, Minimum Overhead:}\\[2pt]
-\large $\mathcal{O}(1)$-Memory Activation Probing and the Scaling Limits of
-Long-Context Safety Monitors}
+\title{\textbf{Silence of the RAM:}\\[3pt]
+\Large Constant-Memory Safety Probing and the Frontiers of Streaming Guardrails}
 \author{%
   \normalsize Shreyas Venkata Ramanan\\[2pt]
   \normalsize \texttt{shreyasvramanan.2545@gmail.com}%
@@ -75,6 +85,13 @@ Long-Context Safety Monitors}
 \vspace{-2.2em}
 
 \begin{abstract}
+% The article class's abstract sits inside a quotation-like environment that restores
+% \parindent locally, so the global \parindent=0pt set by parskip does not reach here.
+% Both are reset explicitly; \noindent then guards the very first line, which is the one
+% \parindent=0pt alone still misses after \maketitle.
+\setlength{\parindent}{0pt}%
+\setlength{\parskip}{0.5em plus 0.1em minus 0.1em}%
+\noindent
 Activation probes are now deployed safety infrastructure, shipped inside frontier
 assistants and used as white-box members of untrusted-monitor ensembles. They are also
 memory-bound: an attention-pooled probe materialises a score tensor over the whole
@@ -82,18 +99,30 @@ sequence, so its footprint grows with the one quantity an adversary controls, th
 length. We study aggregation as the independent variable, holding the token transform
 fixed, and characterise a hard-maximum probe (\emph{MultiMax}) against softmax attention
 pooling, mean pooling and full self-attention across $N \in [128,\,131{,}072]$.
-Three results. \textbf{(i) Systems.} MultiMax streams its reduction and carries only
+Three results follow.
+
+\vspace{0.5em}
+\noindent
+\textbf{(i) Systems.} MultiMax streams its reduction and carries only
 per-head state, giving activation overhead of $\Theta(\min(C,N))$ in the chunk width $C$:
 measured at a flat $19.1$\,MiB from $N{=}8{,}192$ to $131{,}072$ ($\alpha{=}0.000$)
 against $652.1$\,MiB for softmax pooling ($\alpha{=}0.842$), while self-attention reaches
 $10.1$\,GiB and exhausts memory. A chunk ablation confirms the constant is chosen, not
-free. \textbf{(ii) Optimisation.} The hard-max subgradient is supported on $H$ tokens per
+free.
+
+\vspace{0.5em}
+\noindent
+\textbf{(ii) Optimisation.} The hard-max subgradient is supported on $H$ tokens per
 sequence, and at weak signal this prevents learning entirely ($0.00$ recall at its own
 training length). Annealing a \emph{normalised} Boltzmann operator
 $\tau\log(\frac1N\sum_j e^{s_j/\tau})$ to $\tau\!\to\!0$ restores $1.00$ recall; the
 normalisation is load-bearing, since plain LogSumExp injects a length-dependent
 $H\tau\log N$ offset. Calibration by Platt scaling reduces Brier from $0.0538$ to
-$0.0122$ and makes uncertainty gating usable at all. \textbf{(iii) Limits.} Against an
+$0.0122$ and makes uncertainty gating usable at all.
+
+\vspace{0.5em}
+\noindent
+\textbf{(iii) Limits.} Against an
 adversary who fragments a fixed signal budget across $m$ non-contiguous tokens, MultiMax
 and softmax pooling fail together at $m{=}64$; past that boundary softmax retains
 substantially better ranking (AUROC $0.716$ vs $0.523$ at $m{=}256$). We therefore do not
@@ -154,7 +183,8 @@ $j\in\{1,\dots,N\}$. A probe is
   \label{eq:probe}
 \end{equation}
 All probes share $\phi$; only $\rho$ differs. Writing $\alpha_j\ge0$, $\sum_j\alpha_j=1$
-for a convex pooling weight, mean pooling sets $\alpha_j=1/N$ and softmax attention sets
+for a convex pooling weight, mean pooling sets $\alpha_j=1/N$ and softmax attention
+\citep{vaswani2017attention} sets
 $\alpha_j\propto\exp(q^\top y_j/\sqrt m)$, both giving logit
 $w^\top(\sum_j\alpha_jy_j)+b$. MultiMax is not of this form:
 \begin{equation}
@@ -242,14 +272,42 @@ logits, $\alpha_{\mathcal{A}}\le k e^{\gamma}/(ke^{\gamma}+N-k)=\mathcal{O}(N^{-
 
 \begin{theorem}[Padding invariance of the hard maximum]
 \label{thm:multimax}
-Let $X'=\mathrm{pad}(X,P)$ append $P$ benign tokens. Then
-$a_h(X')=\max\{a_h(X),\max_{j\in\text{pad}}v_h^\top y_j\}\ge a_h(X)$, and if the padded
-tokens do not exceed the incumbent, $a_h(X')=a_h(X)=\Omega(1)$ independent of $P$.
+Let $X'=\mathrm{pad}(X,P)$ append $P$ benign tokens to $X$. Then
+\begin{enumerate}[label=(\roman*),leftmargin=2.2em,itemsep=1pt,topsep=2pt]
+  \item \emph{(Monotonicity, deterministic.)}
+        $a_h(X')=\max\{a_h(X),\ \max_{j\in\mathrm{pad}}v_h^\top y_j\}\ \ge\ a_h(X)$:
+        padding can only add candidates, never dilute the incumbent.
+  \item \emph{(Exact invariance, high probability.)} Write the incumbent's margin over
+        the benign mean as $\Delta_h=a_h(X)-\mu_b>0$. Under Assumption~\ref{asm:needle}
+        the padded scores are $\mu_b+\varepsilon_j$ with $\varepsilon_j$ sub-Gaussian of
+        proxy $\tau^2$, so
+        \begin{equation}
+          \Pr\big[a_h(X')=a_h(X)\big]
+          \;\ge\; 1-P\exp\!\Big(-\tfrac{\Delta_h^{2}}{2\tau^{2}}\Big).
+          \label{eq:padinv}
+        \end{equation}
+        Hence $a_h$ is \emph{exactly} unchanged with probability at least $1-\delta$ for
+        every padding length
+        $P\le\delta\exp\!\big(\Delta_h^{2}/2\tau^{2}\big)$.
+\end{enumerate}
 \end{theorem}
 \begin{proof}
-The maximum over a union of index sets is the maximum of the sub-maxima; monotonicity is
-immediate from $\mathcal{A}\subseteq\{1,\dots,N+P\}$.
+(i) The maximum over a union of index sets is the maximum of the sub-maxima, and
+$\mathcal{A}\subseteq\{1,\dots,N+P\}$ gives monotonicity. (ii) By (i), $a_h(X')\neq a_h(X)$
+requires some padded token to strictly exceed the incumbent. A sub-Gaussian tail bound
+gives $\Pr[\varepsilon_j\ge\Delta_h]\le\exp(-\Delta_h^2/2\tau^2)$ for each $j$, and a union
+bound over the $P$ padded positions yields \eqref{eq:padinv}. Solving
+$P\exp(-\Delta_h^2/2\tau^2)\le\delta$ for $P$ gives the stated range.
 \end{proof}
+
+Part (ii) is what makes the theorem non-vacuous: the tolerable padding budget grows
+\emph{exponentially} in the squared signal-to-noise ratio $\Delta_h^2/\tau^2$, so at any
+fixed margin the invariance survives context growth of many orders of magnitude. Read in
+the other direction, holding $P$ fixed and asking what margin is required gives
+$\Delta_h\gtrsim\tau\sqrt{2\log(P/\delta)}$ --- the same $\sqrt{\log N}$ scale that
+reappears as a cost in Remark~\ref{rem:fpr}. The two statements are one phenomenon seen
+from opposite sides: the benign maximum creeps upward like $\tau\sqrt{2\log N}$, and that
+creep is precisely what eventually overtakes a fixed incumbent.
 
 \begin{remark}[The price: benign extremes]
 \label{rem:fpr}
@@ -280,14 +338,17 @@ logit $z=\sum_{h=1}^H a_h + b$ of \eqref{eq:multimax} satisfies
   \label{eq:hardgrad}
 \end{equation}
 independently of $N$. By contrast, for softmax pooling with weights
-$\alpha_j=\mathrm{softmax}_j(q^\top y_j/\sqrt m)$ the corresponding support is
+$\alpha_j=\mathrm{softmax}_j(q^\top y_j/\sqrt m)$ and pooled vector
+$\bar y=\sum_{j'}\alpha_{j'}y_{j'}$, the gradient is dense: for every $j$,
 \begin{equation}
-  \frac{\partial}{\partial y_j}\Big(w^\top\!\sum_{j'}\alpha_{j'}y_{j'}\Big)
-  \;\ne\;0 \quad\text{for every } j,
+  \frac{\partial}{\partial y_j}\big(w^\top\bar y\big)
+  \;=\;\alpha_j\Big[\,w+\tfrac{1}{\sqrt m}\,\big(w^\top(y_j-\bar y)\big)\,q\,\Big]
+  \;\ne\;0
   \qquad\text{so}\qquad
-  \big|\mathrm{supp}\big(\partial z/\partial y\big)\big| = N .
+  \big|\mathrm{supp}\big(\partial z/\partial y\big)\big| = N ,
   \label{eq:softgrad}
 \end{equation}
+for all $(w,q)$ outside a Lebesgue-null set.
 \end{theorem}
 
 \begin{proof}
@@ -296,9 +357,25 @@ iterate; uniqueness of $j^\star_h$ makes this identity locally exact, so $a_h$ i
 differentiable there with $\partial a_h/\partial s_j = \mathbb{1}[j=j^\star_h]$, and the
 chain rule through $s_j = v_h^\top y_j$ gives \eqref{eq:hardgrad}. Summing over $h$, the
 support of $\partial z/\partial y$ is contained in $\{j^\star_1,\dots,j^\star_H\}$, a set
-of at most $H$ indices. For softmax, $\alpha_j>0$ strictly for all $j$ because the
-exponential is positive, and the derivative of the pooled vector with respect to $y_j$
-contains the term $\alpha_j w$, which is non-zero; no cancellation occurs for generic $w$.
+of at most $H$ indices.
+
+For softmax, differentiating $\alpha_{j'}=\mathrm{softmax}_{j'}(q^\top y_{j'}/\sqrt m)$
+gives the standard Jacobian
+$\partial\alpha_{j'}/\partial y_j=\alpha_j(\delta_{jj'}-\alpha_{j'})\,q/\sqrt m$. Hence
+\begin{align}
+  \frac{\partial}{\partial y_j}\big(w^\top\bar y\big)
+  &= \alpha_j w
+     + \frac{q}{\sqrt m}\sum_{j'}\big(w^\top y_{j'}\big)\,
+       \alpha_j\big(\delta_{jj'}-\alpha_{j'}\big) \nonumber\\
+  &= \alpha_j w
+     + \frac{\alpha_j q}{\sqrt m}\Big(w^\top y_j-\textstyle\sum_{j'}\alpha_{j'}w^\top y_{j'}\Big)
+   = \alpha_j\Big[w+\tfrac{1}{\sqrt m}\big(w^\top(y_j-\bar y)\big)q\Big].
+\end{align}
+The prefactor $\alpha_j$ is strictly positive for every $j$ because the exponential is,
+so the derivative vanishes only if the bracket does, which forces $w\parallel q$ --- a
+condition confined to a Lebesgue-null subset of $(w,q)$ and, even there, satisfied only at
+the isolated $y_j$ solving the resulting scalar equation. Generically the support is all
+$N$ positions.
 \end{proof}
 
 \begin{remark}[The bottleneck, quantified]
@@ -531,30 +608,48 @@ tokens presents per-token magnitude $S/m$, so
 the exact dual of Prop.~\ref{prop:mean}. This is the attack aimed at a maximum, and it is
 the structural price of the hard reduction.
 
-\begin{table}[t]
+% [!ht] not [t]: at eight columns this table no longer fits the crowded top-of-page float
+% queue in this section and drifted three pages past the text that discusses it.
+\begin{table}[!ht]
 \centering\small
-\begin{tabular}{rrccc}
+\begin{tabular}{rrcccccc}
 \toprule
-$m$ & per-token $S/m$ & MultiMax & Softmax attention & Mean pooling\\
+& & \multicolumn{2}{c}{MultiMax (ours)} & \multicolumn{2}{c}{Softmax attention}
+  & \multicolumn{2}{c}{Mean pooling}\\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+$m$ & per-token $S/m$ & recall & AUROC & recall & AUROC & recall & AUROC\\
 \midrule
-$1$   & $2.0000$ & $1.000$ & $1.000$ & $0.140$\\
-$16$  & $0.1250$ & $1.000$ & $1.000$ & $0.140$\\
-$64$  & $0.0312$ & $\mathbf{0.480}$ & $\mathbf{0.440}$ & $0.100$\\
-$256$ & $0.0078$ & $0.020$ & $0.000$ & $0.060$\\
+$1$   & $2.0000$ & $1.000$ & $1.000$ & $1.000$ & $1.000$ & $0.140$ & $0.802$\\
+$16$  & $0.1250$ & $1.000$ & $1.000$ & $1.000$ & $1.000$ & $0.140$ & $0.830$\\
+$64$  & $0.0312$ & $\mathbf{0.480}$ & $0.941$ & $\mathbf{0.440}$ & $0.923$
+                 & $0.100$ & $0.795$\\
+$256$ & $0.0078$ & $0.020$ & $0.523$ & $0.000$ & $0.716$ & $0.060$ & $\mathbf{0.753}$\\
 \bottomrule
 \end{tabular}
-\caption{Recall at $1\%$ FPR under fragmentation, $N{=}16{,}384$. Failure boundary
-(recall $<0.80$): MultiMax $m{=}64$, softmax $m{=}64$, mean pooling $m{=}1$.}
+\caption{Recall at $1\%$ FPR and AUROC under fragmentation, $N{=}16{,}384$, fixed budget
+$S{=}2.0$. Failure boundary (recall $<0.80$): MultiMax $m{=}64$, softmax $m{=}64$, mean
+pooling $m{=}1$. Bold marks the boundary row and the best AUROC at $m{=}256$.}
 \label{tab:distributed}
 \end{table}
 
-Two points, both against our own interest. First, the predicted MultiMax-specific
-vulnerability \emph{did not isolate}: both pooled aggregators fail at the same $m$, so at
+Three points, all against our own interest. First, the predicted MultiMax-specific
+vulnerability \emph{did not isolate}: both peaked aggregators fail at the same $m$, so at
 this budget the distributed attack degrades query-based pooling as much as the hard
 reduction. Second, the recall boundary hides a real difference. At $m{=}256$ both sit at
 recall $\approx0$ under a $1\%$ FPR threshold, but AUROC is $0.523$ for MultiMax against
 $0.716$ for softmax: softmax keeps usable ordering after the thresholded detector has
 failed, while the hard maximum loses its signal more completely.
+
+Third --- and this is the result we least expected --- mean pooling is \emph{invariant} to
+fragmentation, exactly as \eqref{eq:distributed} predicts. Its AUROC moves only within
+$0.753$--$0.840$ across a $256\times$ spread of the same budget, while MultiMax falls from
+$1.000$ to $0.523$ over the same range. The aggregator that is strictly worst at $m{=}1$
+(AUROC $0.802$ against $1.000$) is strictly best at $m{=}256$ ($0.753$ against $0.716$ and
+$0.523$), and the crossing is not a tie-break but a consequence of the structure: a mean
+reads accumulated deviation, which is the one functional a budget-preserving adversary
+cannot reduce. This is the sharpest evidence in the paper that our recommendation must be
+architectural rather than a claim of dominance --- and it converts the ensembling
+suggestion of \S\ref{sec:countermeasures} from speculation into a measured complementarity.
 
 % =====================================================================================
 \section{Related Work}
@@ -588,7 +683,12 @@ the approach. \citet{chanin2024absorption} show \emph{feature absorption}: under
 objective a hierarchical parent feature stops firing where it should, its mass captured by
 more specific children, so a monitored feature can be silent exactly when it matters. More
 sharply, \citet{korznikov2026sanity} find that on sparse probing and causal editing, trained
-dictionaries do not reliably beat random dictionaries of matched shape.
+dictionaries do not reliably beat random dictionaries of matched shape. The countervailing
+evidence is applied rather than benchmark-based: \citet{marks2025auditing} run a blind
+auditing game against a model trained to conceal an objective, and dictionary-based
+investigation is among the techniques that recover it --- so the tools are useful to a human
+investigator with time and hypotheses, which is a different claim from being reliable as an
+unattended monitor. It is the latter property a deployed guardrail needs.
 
 We therefore avoid dictionary dependence entirely. The probes here read the residual stream
 directly, which forgoes feature-level interpretability but makes the memory and gradient
@@ -660,10 +760,21 @@ token transform $\phi$, which dominates the FLOP count; the reduction itself is 
 and negligible. What separates them is \emph{traffic}. Softmax pooling writes an
 $(1,N,m)$ intermediate to HBM and reads it back to form the weighted sum, so it moves
 $\Theta(Nm)$ bytes twice; the streaming maximum writes $\Theta(H)$ bytes per chunk and
-never re-reads. At $N{=}131{,}072$, $m{=}512$ in bf16 that is roughly $128$\,MiB of avoidable
-round-trip per sequence, and it is the reason the latency gap ($12.729$ vs $9.205$\,ms)
-is smaller than the memory gap ($652.1$ vs $19.1$\,MiB): the kernels are bandwidth-bound,
-not arithmetic-bound, and bandwidth is what the streaming reduction buys.
+never re-reads. At $N{=}131{,}072$, $m{=}512$ in bf16 a single such intermediate is
+$131{,}072\times512\times2\,\text{B}=128$\,MiB exactly, so one write-then-read costs
+$256$\,MiB of avoidable traffic per sequence.
+
+One clarification, since the arithmetic invites a false comparison: $128$\,MiB is the size
+of \emph{one} intermediate, not the measured $652.1$\,MiB peak of Table~\ref{tab:memory}.
+The peak additionally holds the transform output, the attention scores, the weighted
+product and autograd workspace, several of them live simultaneously; the bandwidth
+argument concerns per-tensor traffic, the memory law concerns peak residency, and they are
+different quantities that happen to share a cause. What the traffic figure does explain is
+the shape of the gap: latency differs by $1.4\times$ ($12.729$ vs $9.205$\,ms) while memory
+differs by $34\times$ ($652.1$ vs $19.1$\,MiB). If these kernels were arithmetic-bound the
+two ratios would track each other, because all three aggregators issue the same
+$\Theta(Nmd)$ multiply-accumulates. They do not track, which is the signature of a
+bandwidth-bound regime --- and bandwidth, not FLOPs, is what the streaming reduction buys.
 
 Three practical consequences. \emph{Batching.} Since overhead is $\Theta(\min(C,N))$ per
 sequence rather than $\Theta(N)$, admissible batch size at fixed memory is set by $C$, which
@@ -691,10 +802,14 @@ most direct patch; it is untested here.
 
 \emph{Ensembling across aggregators.} Because mean pooling is by construction invariant to
 $m$ at fixed budget (\eqref{eq:distributed}), a mean-pooled member covers precisely the
-regime where the maximum fails. This is the mechanism behind the error-decorrelation that
-\citet{koran2026ensemble} observe empirically, and it suggests aggregator diversity is the
-principled axis on which to build a monitor ensemble --- at the cost of reintroducing a
-$\Theta(N)$ member unless that member is itself streamed.
+regime where the maximum fails. Table~\ref{tab:distributed} measures this rather than
+assuming it: mean pooling holds AUROC $0.753$--$0.840$ across the full $256\times$
+fragmentation sweep and overtakes both peaked aggregators at $m{=}256$. That is
+error-decorrelation of the kind \citet{koran2026ensemble} observe, with an identified
+cause --- aggregator diversity, not model diversity --- which suggests it is the principled
+axis on which to build a monitor ensemble. The cost is reintroducing a $\Theta(N)$ member
+unless that member is itself streamed; a running mean is, so this particular pair is
+compatible with the memory law.
 
 \emph{Budget accounting rather than peak detection.} The deepest issue is that a maximum
 answers ``is any single token anomalous'' when the security question is ``is the total
