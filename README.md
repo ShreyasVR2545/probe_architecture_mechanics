@@ -1,10 +1,10 @@
-# Max Duty, Minimum Overhead
+# Silence of the RAM
 
-**$\mathcal{O}(1)$-Memory Activation Probing and the Scaling Limits of Long-Context Safety Monitors**
+**Constant-Memory Safety Probing and the Frontiers of Streaming Guardrails**
 
 ![Python](https://img.shields.io/badge/python-3.14-blue)
 ![PyTorch](https://img.shields.io/badge/pytorch-2.11%2Bcu128-ee4c2c)
-![claims](https://img.shields.io/badge/claim%20checks-32%2F32%20passing-brightgreen)
+![claims](https://img.shields.io/badge/claim%20checks-41%2F41%20passing-brightgreen)
 ![context](https://img.shields.io/badge/context-128%20→%20131%2C072-informational)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
@@ -26,6 +26,7 @@ transform fixed, and measures four reductions across $N \in [128,\;131{,}072]$.
 | **Optimisation fix** | The hard-max subgradient touches only $H$ tokens/step. At $S{=}0.10$ this stopped learning entirely (**0.00** recall). Normalised Boltzmann annealing restores **1.00**. |
 | **Calibration** | Sum-of-maxima logits are upward-biased. Platt scaling cuts Brier **0.0538 → 0.0122**, accuracy **0.931 → 0.988**. |
 | **Honest limit** | Under a fragmented attack MultiMax and softmax **fail together at $m{=}64$**, and past it softmax ranks better (AUROC **0.716 vs 0.523**). We do *not* claim a general detection advantage. |
+| **Sharpest result against us** | Mean pooling is *fragmentation-invariant*: AUROC moves only within **0.753–0.840** across a 256× spread of the same budget, and it is the **best** of the three at $m{=}256$. The aggregator that loses at $m{=}1$ wins at $m{=}256$ — which is why aggregator diversity, not model diversity, is the principled ensembling axis. |
 
 > **The defensible claim is architectural.** MultiMax is the right $\Theta(1)$-memory
 > **first stage of a cascade** — not a replacement for inspection.
@@ -105,12 +106,16 @@ python benchmark_suite.py            # --quick for a smaller ladder
 python suite_d_chunk_ablation.py     # answers "is O(1) just chunking?"
 
 # verification and artifacts
-python tools/check_claims.py         # 32/32 prose-vs-artifact checks
-python tools/check_tex.py            # LaTeX structure + amsthm numbering
-python tools/make_figures.py               # figures/*.pdf and *.png
+python tools/check_claims.py         # 41/41 prose-vs-artifact checks (incl. paper.tex)
+python tools/check_tex.py            # structure, numbering, dangling refs + citations
+python tools/audit_bib.py            # every arXiv id re-resolved against the arXiv API
+python tools/make_figures.py         # figures/*.pdf and *.png
 
-# paper
-latexmk -pdf paper.tex               # -> paper.pdf
+# paper  (latexmk needs Perl; this sequence does not)
+pdflatex -interaction=nonstopmode paper.tex
+bibtex paper
+pdflatex -interaction=nonstopmode paper.tex
+pdflatex -interaction=nonstopmode paper.tex
 ```
 
 > **Note on determinism.** Benchmarks are seeded and reproduce exactly run-to-run on the
@@ -136,8 +141,9 @@ BENCHMARK_NOTES.md           measured tables, bugs found, limitations
 benchmark_results.json       Suites A-D, verdicts          <- single source of truth
 logs/calibration_report.json Platt metrics + delta sweep
 tools/make_figures.py        all figures, driven from the JSON artifact
-tools/check_claims.py        verifies prose against artifacts (32 checks)
-tools/check_tex.py           LaTeX structural audit + numbering
+tools/check_claims.py        verifies prose against artifacts (41 checks)
+tools/check_tex.py           LaTeX structure, numbering, refs + citation audit
+tools/audit_bib.py           re-resolves every arXiv id against the arXiv API
 
 01..05_*.py, src/            earlier mechanistic-interpretability phases
                              (SAE decomposition, ensemble subspaces)
