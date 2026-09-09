@@ -107,7 +107,7 @@ python suite_d_chunk_ablation.py     # answers "is O(1) just chunking?"
 # verification and artifacts
 python tools/check_claims.py         # 32/32 prose-vs-artifact checks
 python tools/check_tex.py            # LaTeX structure + amsthm numbering
-python make_figures.py               # figures/*.pdf and *.png
+python tools/make_figures.py               # figures/*.pdf and *.png
 
 # paper
 latexmk -pdf paper.tex               # -> paper.pdf
@@ -127,7 +127,7 @@ multimax_probe.py            MultiMaxProbe + Softmax/Mean/SelfAttn baselines,
 cascading_classifier.py      Platt calibration, budget-driven delta, cost model
 benchmark_suite.py           Suite A (systems) / B (weak signal) / C (distributed)
 suite_d_chunk_ablation.py    Suite D: chunk x length, the O(1) rebuttal
-make_figures.py              all figures, driven from the JSON artifact
+
 
 paper.tex / references.bib   manuscript + bibliography
 math_formulation.tex         standalone derivations (18 numbered results)
@@ -135,6 +135,7 @@ BENCHMARK_NOTES.md           measured tables, bugs found, limitations
 
 benchmark_results.json       Suites A-D, verdicts          <- single source of truth
 logs/calibration_report.json Platt metrics + delta sweep
+tools/make_figures.py        all figures, driven from the JSON artifact
 tools/check_claims.py        verifies prose against artifacts (32 checks)
 tools/check_tex.py           LaTeX structural audit + numbering
 

@@ -21,6 +21,29 @@
 \usepackage[colorlinks=true,linkcolor=black,citecolor=blue,urlcolor=blue]{hyperref}
 \usepackage{caption}
 \usepackage{microtype}
+\usepackage{titlesec}
+
+% ---- Paragraph model -------------------------------------------------------------
+% parskip must load AFTER the packages that set up sectioning, or its lengths get
+% overwritten. We then restate both lengths explicitly: several classes and packages
+% (amsthm and caption among them) reset \parindent locally, so relying on parskip's
+% defaults alone leaves stray first-line indents on secondary paragraphs under a
+% heading -- exactly the flaw this fixes.
+\usepackage{parskip}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{5.5pt plus 1pt minus 1pt}
+
+% amsthm bodies and \paragraph runs-in otherwise reintroduce an indent.
+\makeatletter
+\def\@afterindentfalse{\let\if@afterindent\iffalse}
+\@afterindentfalse
+\makeatother
+
+% Precise, uniform heading padding.
+\titlespacing*{\section}      {0pt}{14pt plus 2pt minus 2pt}{6pt plus 1pt}
+\titlespacing*{\subsection}   {0pt}{11pt plus 2pt minus 2pt}{5pt plus 1pt}
+\titlespacing*{\subsubsection}{0pt}{9pt plus 1.5pt minus 1.5pt}{4pt plus 1pt}
+\titlespacing*{\paragraph}    {0pt}{7pt plus 1pt minus 1pt}{6pt}
 
 \theoremstyle{plain}
 \newtheorem{theorem}{Theorem}[section]
@@ -41,7 +64,15 @@
 \title{\textbf{Max Duty, Minimum Overhead:}\\[2pt]
 \large $\mathcal{O}(1)$-Memory Activation Probing and the Scaling Limits of
 Long-Context Safety Monitors}
-\author{}
+\author{%
+  \normalsize Shreyas Venkata Ramanan\\[1pt]
+  % NOTE: the affiliation supplied read "Shreyas Venkata RamananTechnology Bombay",
+  % which is a truncated concatenation. The name is used as given; the institution is
+  % left as an explicit placeholder rather than guessed, since an affiliation is a
+  % factual claim about a person. Replace the line below before submission.
+  \normalsize \textit{[affiliation to be confirmed]}\\[1pt]
+  \normalsize \texttt{shreyasvramanan.2545@gmail.com}%
+}
 \date{}
 
 \begin{document}
@@ -139,16 +170,54 @@ $w^\top(\sum_j\alpha_jy_j)+b$. MultiMax is not of this form:
 with predictions through a bounded link $\hat p=\varsigma(\Pi_{[-c,c]}(\mathrm{logit}))$,
 $\varsigma(z)=(1+e^{-z})^{-1}$, $c=10$.
 
-\begin{remark}[The clamp must not be the trap it prevents]
+\subsection{The bounded link and gradient propagation under saturation}
+\label{sec:ste}
+
+The clamp exists for a numerical reason. A MultiMax logit is a sum of $H$ maxima, and by
+Remark~\ref{rem:fpr} each summand grows like $\tau\sqrt{2\log N}$ even under the null, so
+$|z|$ drifts upward with context length. In fp16 the sigmoid saturates to exactly $0$ or
+$1$ well before that, and the binary cross-entropy then returns a non-finite loss. Bounding
+$z$ removes the overflow. It also, if implemented naively, removes the gradient.
+
+\begin{remark}[The clamp must not become the trap it prevents]
 \label{rem:clamp}
 $\Pi_{[-c,c]}$ has derivative $\mathbb{1}[|z|<c]$, identically zero on the saturated
-region: a guard introduced to avoid vanishing gradients \emph{creates} them. We measured
-exactly $0.000$ gradient norm on a saturated logit. We use a straight-through estimator
-\citep{bengio2013estimating}, $\widetilde\Pi(z)=z+\sg(\Pi_{[-c,c]}(z)-z)$, whose forward
-value is the clamp and whose derivative is $1$. Parameter gradients then survive at
-deployment lengths: $\sum|\nabla_\theta|=2.81\times10^{5}$ at $N{=}131{,}072$ with a raw
-logit of $46.75$ clamped to $10$.
+region, so with $\mathcal{L}$ the loss and $\theta$ any parameter,
+\begin{equation}
+  \frac{\partial\mathcal{L}}{\partial\theta}
+  = \underbrace{\frac{\partial\mathcal{L}}{\partial\hat p}\,
+    \varsigma'\!\big(\Pi(z)\big)}_{\text{finite}}
+  \cdot\underbrace{\mathbb{1}\big[|z|<c\big]}_{=\,0 \text{ when } |z|>c}
+  \cdot\frac{\partial z}{\partial\theta}
+  \;=\;0
+  \qquad\text{whenever } |z|>c .
+  \label{eq:deadgrad}
+\end{equation}
+A guard introduced to avoid vanishing gradients \emph{creates} them, and does so precisely
+in the regime it was added for. We measured exactly $0.000$ gradient norm on a saturated
+logit. Substituting the straight-through estimator \citep{bengio2013estimating},
+\begin{equation}
+  \widetilde\Pi(z)=z+\sg\!\big(\Pi_{[-c,c]}(z)-z\big),
+  \qquad
+  \widetilde\Pi(z)=\Pi_{[-c,c]}(z)\ \text{ (forward)},
+  \qquad
+  \frac{\partial\widetilde\Pi}{\partial z}\equiv1\ \text{ (backward)},
+  \label{eq:ste}
+\end{equation}
+restores \eqref{eq:deadgrad} to
+$\partial\mathcal{L}/\partial\theta=(\partial\mathcal{L}/\partial\hat p)\,
+\varsigma'(\Pi(z))\,\partial z/\partial\theta$. The surviving factor
+$\varsigma'(\Pi(z))=\varsigma(c)(1-\varsigma(c))\approx4.54\times10^{-5}$ at $c=10$ is
+small but strictly positive, so a saturated unit is slowed rather than killed. At
+$N{=}131{,}072$ with a raw logit of $46.75$ clamped to $10$, parameter gradients measure
+$\sum_\theta|\nabla_\theta|=2.81\times10^{5}$; with the plain clamp the same configuration
+gives exactly $0.000$.
 \end{remark}
+
+We note the estimator is biased: forward and backward correspond to different functions,
+so $\widetilde\Pi$ is not the gradient of any scalar. This is acceptable here because the
+bias is confined to a region the model should leave --- the update always points toward
+$|z|<c$, where forward and backward agree again and the estimator becomes exact.
 
 \subsection{Dilution}
 \begin{assumption}[Localised needle]
@@ -200,20 +269,54 @@ degradation into a logarithmic one rather than removing length dependence.
 \section{Subgradient Sparsity and Normalised Boltzmann Annealing}
 \label{sec:annealing}
 % =====================================================================================
-\begin{remark}[Subgradient bottleneck]
-\label{rem:sparsity}
-Theorem~\ref{thm:multimax} concerns the forward map. In training,
+Theorem~\ref{thm:multimax} concerns the forward map only. The training dynamics are a
+separate matter, and they turn out to be where the hard maximum is weakest.
+
+\begin{theorem}[Subgradient support of the hard maximum]
+\label{lem:sparsity}
+Let $s_j=v_h^\top y_j$ and suppose the maximiser $j^\star_h=\argmax_j s_j$ is unique for
+each head $h$ (which holds almost surely for continuously distributed features). Then the
+logit $z=\sum_{h=1}^H a_h + b$ of \eqref{eq:multimax} satisfies
 \begin{equation}
   \frac{\partial a_h}{\partial y_j}
-  = v_h\,\mathbb{1}\!\left[j=\argmax_{j'}v_h^\top y_{j'}\right],
+  = v_h\,\mathbb{1}\!\left[\,j=j^\star_h\,\right],
+  \qquad\text{hence}\qquad
+  \big|\mathrm{supp}\big(\partial z/\partial y\big)\big| \;\le\; H,
   \label{eq:hardgrad}
 \end{equation}
-so $|\mathrm{supp}(\partial\max)|=H$: each head learns from one token per sequence, versus
-all $N$ for softmax. The effective sample size per step is $H$, not $N$. Measured
-directly, gradient reaches $0.39\%$ of positions at $\tau{=}0$ (exactly $H/N$) against
-$100\%$ at $\tau{=}0.5$. Near threshold this prevents learning outright: at strength
-$0.10$ the un-annealed probe scored $0.00$ recall at its \emph{own training length}, an
-optimisation failure invisible to the forward-only analysis.
+independently of $N$. By contrast, for softmax pooling with weights
+$\alpha_j=\mathrm{softmax}_j(q^\top y_j/\sqrt m)$ the corresponding support is
+\begin{equation}
+  \frac{\partial}{\partial y_j}\Big(w^\top\!\sum_{j'}\alpha_{j'}y_{j'}\Big)
+  \;\ne\;0 \quad\text{for every } j,
+  \qquad\text{so}\qquad
+  \big|\mathrm{supp}\big(\partial z/\partial y\big)\big| = N .
+  \label{eq:softgrad}
+\end{equation}
+\end{theorem}
+
+\begin{proof}
+For the maximum, write $a_h=\max_j s_j = s_{j^\star_h}$ in a neighbourhood of the current
+iterate; uniqueness of $j^\star_h$ makes this identity locally exact, so $a_h$ is
+differentiable there with $\partial a_h/\partial s_j = \mathbb{1}[j=j^\star_h]$, and the
+chain rule through $s_j = v_h^\top y_j$ gives \eqref{eq:hardgrad}. Summing over $h$, the
+support of $\partial z/\partial y$ is contained in $\{j^\star_1,\dots,j^\star_H\}$, a set
+of at most $H$ indices. For softmax, $\alpha_j>0$ strictly for all $j$ because the
+exponential is positive, and the derivative of the pooled vector with respect to $y_j$
+contains the term $\alpha_j w$, which is non-zero; no cancellation occurs for generic $w$.
+\end{proof}
+
+\begin{remark}[The bottleneck, quantified]
+\label{rem:sparsity}
+Theorem~\ref{lem:sparsity} says each head learns from \emph{one} token per sequence. The
+effective sample size per gradient step is therefore $H$ rather than $N$: at $H{=}8$,
+$N{=}2048$ the gradient reaches $H/N=0.39\%$ of positions, which is exactly what we
+measure ($0.39\%$ at $\tau{=}0$ against $100\%$ at $\tau{=}0.5$). The consequence is not
+merely slow convergence. Before the argmax has locked onto $\mathcal{A}$, the single token
+receiving signal is a benign one chosen essentially at random, so the update carries no
+information about the concept; at strength $0.10$ the un-annealed probe scored $0.00$
+recall at its \emph{own training length}, a pure optimisation failure with no dilution
+component and invisible to the forward-only analysis of Theorem~\ref{thm:multimax}.
 \end{remark}
 
 The obstruction is a property of the training objective, not of the deployed map, so it
@@ -227,19 +330,52 @@ can be annealed away. Replace the maximum by the \emph{normalised} Boltzmann ope
   \smax_\tau\xrightarrow[\tau\to\infty]{}\tfrac1N\textstyle\sum_j s_j,
   \label{eq:boltzmann}
 \end{equation}
-whose gradient $\mathrm{softmax}(s/\tau)_j$ is dense for $\tau>0$. Annealing $\tau\to0$
-recovers the exact hard max at deployment, so Theorem~\ref{thm:multimax} still describes
-the shipped model.
+The relaxation is useful because its gradient is dense. Differentiating
+\eqref{eq:boltzmann},
+\begin{equation}
+  \frac{\partial\,\smax_\tau(s)}{\partial s_k}
+  \;=\;\frac{\tfrac1N e^{s_k/\tau}\cdot\tfrac1\tau}
+            {\tfrac1N\sum_{j=1}^{N}e^{s_j/\tau}}\cdot\tau
+  \;=\;\frac{e^{s_k/\tau}}{\sum_{j=1}^{N}e^{s_j/\tau}}
+  \;=\;\mathrm{softmax}(s/\tau)_k \;>\;0
+  \qquad\text{for all } k,
+  \label{eq:smaxgrad}
+\end{equation}
+so the support is all $N$ positions, and $\sum_k\partial\smax_\tau/\partial s_k=1$: the
+operator distributes exactly one unit of gradient mass, reallocating it from the single
+argmax towards the whole sequence as $\tau$ grows. The $1/N$ factor cancels in
+\eqref{eq:smaxgrad}, which is why normalisation costs nothing in the backward pass while
+mattering a great deal in the forward one. Annealing $\tau\to0$ concentrates
+$\mathrm{softmax}(s/\tau)$ onto $j^\star$, recovering both the hard forward map of
+\eqref{eq:multimax} and the sparse subgradient of Theorem~\ref{lem:sparsity}, so
+Theorem~\ref{thm:multimax} still describes the shipped model exactly.
 
-\begin{remark}[The $1/N$ normalisation is load-bearing]
+\begin{remark}[Why the $1/N$ is load-bearing: length-invariance of the logit]
 \label{rem:normalisation}
-Plain $\mathrm{LSE}_\tau$ adds $H\tau\log N$ to the logit: we measured $+42$ at $\tau{=}1$,
-$N{=}512$ and $+68$ at $N{=}16{,}384$. The offset is large \emph{and length-dependent}, so
-the probe relearns its bias every epoch and meets a different offset at deployment length
-than at training length. The observable symptom was a recall curve non-monotone in signal
-strength ($1.00$ at $S{=}0.15$, $0.04$ at $S{=}0.50$) --- a bug signature, not an effect.
-The $1/N$ term removes it, and the operator then interpolates max$\leftrightarrow$mean
-with bounded, length-independent offset.
+Consider the null case in which head scores are i.i.d.\ with mean $\mu$. Unnormalised
+LogSumExp gives
+\begin{equation}
+  \mathrm{LSE}_\tau(s)=\tau\log\sum_{j=1}^{N}e^{s_j/\tau}
+  =\tau\log\!\Big(N\cdot\tfrac1N\textstyle\sum_j e^{s_j/\tau}\Big)
+  =\underbrace{\tau\log N}_{\text{grows with }N}+\;\smax_\tau(s),
+  \label{eq:lseshift}
+\end{equation}
+and summing over $H$ heads the logit acquires an additive term $H\tau\log N$. Two
+consequences follow, and both are fatal for a probe that trains short and deploys long.
+First, the shift moves during training as $\tau$ anneals, so the bias $b$ must be relearned
+at every epoch. Second, and worse, it moves with $N$: a probe fitted at $N_{\text{train}}$
+meets an offset $H\tau\log(N_{\text{deploy}}/N_{\text{train}})$ larger at deployment, which
+no amount of in-distribution calibration anticipates. Taking expectations in
+\eqref{eq:boltzmann} instead,
+$\E[\smax_\tau(s)]$ depends on $N$ only through the extreme-value term of
+Remark~\ref{rem:fpr}, which is $\Theta(\sqrt{\log N})$ rather than $\Theta(\log N)$ and
+carries no $\tau$ or $H$ multiplier.
+
+The prediction is quantitative and we confirmed it: $H\tau\log N$ at $H{=}8$, $\tau{=}1$,
+$N{=}512$ evaluates to $49.9$ against a measured $+42$, and at $N{=}16{,}384$ to $77.6$
+against a measured $+68$. The observable symptom before the fix was a recall curve
+non-monotone in signal strength ($1.00$ at $S{=}0.15$ but $0.04$ at $S{=}0.50$) --- a bug
+signature rather than an effect, since no dilution mechanism improves with a weaker needle.
 \end{remark}
 
 % =====================================================================================
@@ -428,34 +564,74 @@ failed, while the hard maximum loses its signal more completely.
 % =====================================================================================
 \section{Related Work}
 % =====================================================================================
-\paragraph{Probing and mechanistic interpretability.}
-Linear probes on intermediate representations date to \citet{alain2016probes}. Recent
-safety work trains them to detect deception \citep{goldowskydill2025deception} and
-evaluates them at scale \citep{kretschmar2026liars,natarajan2026oneprobe}. A consistent
-finding is that probes are strong in-distribution and brittle out of it
-\citep{yoo2026subspace,boxo2025caught}. \citet{parrack2026blacktowhite} argue the right
-metric is the \emph{black-to-white boost} over a black-box monitor, a standard we adopt.
+\subsection{Mechanistic interpretability and linear probing}
+Reading a concept off intermediate representations with a trained classifier dates to
+\citet{alain2016probes}, who used probes diagnostically --- to ask what information a layer
+carries. Safety work inverted the purpose: the probe became the deployed artifact rather
+than the measurement. \citet{goldowskydill2025deception} train linear probes to flag
+strategic deception and report AUROC $0.96$--$0.999$ in distribution, while cautioning that
+the probe may fire on the \emph{topic} of deception rather than the intent.
 
-\paragraph{Long-context guardrails.}
-\citet{kramar2026gemini} deploy probes in a production assistant and report short-to-long
-generalisation failure with architecture as a governing factor.
-\citet{chen2026longguard} attribute the failure to attention dilution and logit-margin
-compression. Our contribution is to isolate aggregation and give it a memory law.
+The recurring finding is a gap between in-distribution and out-of-distribution behaviour.
+\citet{kretschmar2026liars} assemble a type-labelled corpus across four open-weight models
+and find that existing techniques systematically miss particular \emph{kinds} of lie;
+\citet{natarajan2026oneprobe} conclude that type-matched probes outperform any single
+universal one, which is a statement that the concept is not one direction.
+\citet{boxo2025caught} recover multiple deception directions by iterated null-space
+projection, and \citet{yoo2026subspace} recast generalisation itself as selecting which
+principal components transfer. Our setting differs in what is held fixed: those works vary
+the \emph{concept} or the \emph{training distribution} and keep aggregation implicit, while
+we fix the token transform and vary only the reduction. We also adopt the evaluation
+standard of \citet{parrack2026blacktowhite}: a white-box probe should be scored by its
+\emph{black-to-white boost} over the black-box monitor it would replace, not against chance.
 
-\paragraph{Sparse dictionaries.}
-Sparse autoencoders \citep{lieberum2024gemmascope} are an alternative route to
-interpretable safety features, complicated by absorption \citep{chanin2024absorption} and
-by the finding that they need not beat random baselines
-\citep{korznikov2026sanity}. We deliberately avoid dictionary dependence.
+\subsection{Sparse autoencoders versus direct probes}
+An alternative route to safety-relevant features is unsupervised dictionary learning.
+\citet{lieberum2024gemmascope} release sparse autoencoders across every layer of an
+open model family, making feature-level monitoring broadly available. Two results temper
+the approach. \citet{chanin2024absorption} show \emph{feature absorption}: under a sparsity
+objective a hierarchical parent feature stops firing where it should, its mass captured by
+more specific children, so a monitored feature can be silent exactly when it matters. More
+sharply, \citet{korznikov2026sanity} find that on sparse probing and causal editing, trained
+dictionaries do not reliably beat random dictionaries of matched shape.
 
-\paragraph{Control and cascades.}
-AI-control protocols pair trusted and untrusted monitors
-\citep{greenblatt2023control,gardnerchallis2026untrusted}, and
-\citet{koran2026ensemble} show diverse monitor ensembles outperform homogeneous ones at
-equal compute. Our cascade is the low-latency first stage such protocols assume but rarely
-characterise. Calibration follows \citet{platt1999probabilistic,guo2017calibration}; the
-smooth-max operator is that of \citet{asadi2017boltzmann}; the straight-through estimator
-is \citet{bengio2013estimating}.
+We therefore avoid dictionary dependence entirely. The probes here read the residual stream
+directly, which forgoes feature-level interpretability but makes the memory and gradient
+analysis exact --- there is no learned basis whose quality must be separately established.
+
+\subsection{AI control, ensembling, and monitoring protocols}
+Control protocols assume a cheap trusted monitor gating a more capable untrusted policy
+\citep{greenblatt2023control}. \citet{gardnerchallis2026untrusted} sketch a safety case for
+untrusted monitoring across four collusion strategies and single out passive
+self-recognition, noting that such protocols need monitors whose failure modes are
+characterised rather than assumed. \citet{koran2026ensemble} show that a diverse
+three-monitor ensemble beats three identical ones by $2.4\times$ at equal compute, with low
+error-correlation the operative property --- but do not explain what makes signals diverse.
+
+Our cascade occupies the position these protocols reserve for a low-latency first stage and
+rarely characterise. The contribution is not the routing rule, which is standard, but the
+demonstration that its memory cost can be made independent of the adversary's context length
+and that its gating is inert without calibration. Calibration follows
+\citet{platt1999probabilistic} and the modern treatment of \citet{guo2017calibration}; the
+smooth-max operator is that of \citet{asadi2017boltzmann}, imported from reinforcement
+learning where it was introduced to make value backups differentiable; the
+straight-through estimator is \citet{bengio2013estimating}.
+
+\subsection{Long-context guardrails and dilution}
+\citet{kramar2026gemini} deploy activation probes in a production assistant and report the
+finding that motivates this paper: probes fail under short-to-long distribution shift, and
+\emph{architecture choice}, not merely training data, governs whether they survive.
+\citet{chen2026longguard} give the mechanism at three layers --- attention mass on the
+unsafe span is diluted, the unsafe-versus-safe logit margin compresses proportionally, and
+the detection decision collapses --- measuring a monotone recall drop of more than $50\%$
+across fifteen guardrails over a $0.25$k--$32$k span, and attributing it to proportional
+dilution of the needle rather than to absolute length.
+
+Both stop short of an aggregation-controlled comparison with a memory law attached. Neither
+reports the optimisation obstruction of Theorem~\ref{lem:sparsity}, which is invisible
+unless one trains a hard-max probe at weak signal, nor the fragmentation boundary of
+\S\ref{sec:distributed}, which requires constructing the adversary that targets a maximum
+specifically.
 
 % =====================================================================================
 \section{Discussion, Rebuttal Analysis, and Limitations}
@@ -479,6 +655,64 @@ appendix; it is why our claim is architectural rather than a detection claim.
 (ii) \emph{``Is $19.1$\,MiB truly $\mathcal{O}(1)$?''} Half right, and it prompted the
 chunk ablation of Rem.~\ref{rem:complexity}, which replaces an $\mathcal{O}(1)$ assertion
 with the measured law $\Theta(\min(C,N))$.
+
+\subsection{Deployment mechanics: bandwidth, not FLOPs}
+\label{sec:deployment}
+
+The systems argument is easy to misread as being about compute. It is not. All three
+$\Theta(N)$-time aggregators perform the same $\Theta(Nmd)$ multiply-accumulates in the
+token transform $\phi$, which dominates the FLOP count; the reduction itself is $\Theta(Nm)$
+and negligible. What separates them is \emph{traffic}. Softmax pooling writes an
+$(1,N,m)$ intermediate to HBM and reads it back to form the weighted sum, so it moves
+$\Theta(Nm)$ bytes twice; the streaming maximum writes $\Theta(H)$ bytes per chunk and
+never re-reads. At $N{=}131{,}072$, $m{=}512$ in bf16 that is roughly $128$\,MiB of avoidable
+round-trip per sequence, and it is the reason the latency gap ($12.729$ vs $9.205$\,ms)
+is smaller than the memory gap ($652.1$ vs $19.1$\,MiB): the kernels are bandwidth-bound,
+not arithmetic-bound, and bandwidth is what the streaming reduction buys.
+
+Three practical consequences. \emph{Batching.} Since overhead is $\Theta(\min(C,N))$ per
+sequence rather than $\Theta(N)$, admissible batch size at fixed memory is set by $C$, which
+the operator controls, rather than by the longest request in flight. \emph{Tail latency.}
+The $\Theta(1)$ footprint means a $131$k-token request does not evict a co-resident model,
+so the guardrail does not create the pathological tail that a memory-proportional monitor
+does. \emph{Choosing $C$.} Table~\ref{tab:memory} and Remark~\ref{rem:complexity} make this
+a direct trade: $C{=}512$ costs $12.1$\,MiB, $C{=}4096$ costs $19.1$\,MiB, and larger $C$
+buys occupancy at linear memory cost until $C$ approaches $N$, where the streaming property
+is lost entirely.
+
+\subsection{Adversarial countermeasures against fragmentation}
+\label{sec:countermeasures}
+
+\S\ref{sec:distributed} establishes that a budget-preserving adversary defeats both pooled
+aggregators at $m{=}64$. We do not have a solution, but the structure of
+\eqref{eq:distributed} constrains what one could look like, and we state the options rather
+than leave the failure unaddressed.
+
+\emph{Top-$r$ instead of top-$1$.} Replacing $\max_j$ by the mean of the $r$ largest scores
+raises the fragmentation threshold from $m{\approx}1$ to $m{\approx}r$ while keeping the
+streaming property, since a running top-$r$ heap is $\Theta(r)$ state. This trades
+Theorem~\ref{thm:multimax}'s exact padding invariance for approximate invariance and is the
+most direct patch; it is untested here.
+
+\emph{Ensembling across aggregators.} Because mean pooling is by construction invariant to
+$m$ at fixed budget (\eqref{eq:distributed}), a mean-pooled member covers precisely the
+regime where the maximum fails. This is the mechanism behind the error-decorrelation that
+\citet{koran2026ensemble} observe empirically, and it suggests aggregator diversity is the
+principled axis on which to build a monitor ensemble --- at the cost of reintroducing a
+$\Theta(N)$ member unless that member is itself streamed.
+
+\emph{Budget accounting rather than peak detection.} The deepest issue is that a maximum
+answers ``is any single token anomalous'' when the security question is ``is the total
+anomalous mass large''. A detector reading accumulated deviation is the natural dual, and
+\eqref{eq:distributed} shows it is exactly what fragmentation leaves invariant. That
+detector is mean pooling, whose $\Theta(1/N)$ dilution is what motivated the maximum in the
+first place --- so the two failure modes are complementary rather than jointly solvable by a
+single pooled statistic. We regard this as the sharpest open problem the paper raises.
+
+\emph{What we can say now.} A deployment facing a fragmentation-capable adversary should not
+rely on a single pooled probe. The cascade framing already anticipates this: the appropriate
+response to $m\ge64$ is to widen $\delta$, escalating more traffic to full inspection, and
+\eqref{eq:cost} prices that decision directly.
 
 \paragraph{Limitations.}
 \emph{Synthetic activations.} Benchmarks run on Gaussian backgrounds with a single fixed
