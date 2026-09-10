@@ -134,11 +134,120 @@ class MeanMaxProbe(_ProbeBase):
         return out.squeeze(0) if x.dim() == 2 else out
 
 
+class StreamingSoftmaxAttnProbe(_ProbeBase):
+    """Single-query softmax pooling computed by the ONLINE-SOFTMAX recurrence.
+
+    This is the fair baseline for the memory comparison. The paper's SoftmaxAttnProbe
+    materialises (B, N, h) features and (B, N) weights over the whole sequence, so its
+    Theta(N) footprint is a property of that implementation and not of the aggregator.
+    Softmax pooling has an exact streaming form with Theta(m) carried state
+    (Milakov & Gimelshein 2018; the mechanism underneath FlashAttention, Dao et al. 2022):
+
+        M <- running max of the scores
+        D <- sum_j exp(s_j - M)
+        V <- sum_j exp(s_j - M) y_j            in R^m
+        pooled = V / D
+
+    On a chunk with max M', set M'' = max(M, M'), rescale the accumulators by
+    exp(M - M''), add the chunk's contribution, and emit V/D at the end. The output is
+    identical to the non-streamed form up to floating point.
+
+    The V update is done as a (B,1,C) @ (B,C,h) matmul rather than by broadcasting the
+    weights against y. Broadcasting would allocate a second (B, C, h) tensor per chunk
+    and would hand the baseline an unnecessary 2x, which is exactly the kind of
+    unlike-for-like comparison this class exists to remove.
+
+    M is initialised to a large finite negative rather than -inf: with -inf the first
+    chunk computes (-inf) - (-inf) = nan in the rescale.
+    """
+
+    kind = "softmax_stream"
+    NEG = -1.0e30
+
+    def __init__(self, cfg: ProbeConfig):
+        super().__init__()
+        self.cfg = cfg
+        self.mlp = nn.Sequential(nn.Linear(cfg.d_model, cfg.hidden), nn.GELU())
+        self.query = nn.Parameter(torch.randn(cfg.hidden) * cfg.hidden ** -0.5)
+        self.out = nn.Linear(cfg.hidden, 1)
+
+    def pooled(self, x: torch.Tensor) -> torch.Tensor:
+        xb, _ = _as_btd(x)
+        B, N, _ = xb.shape
+        C = self.cfg.chunk_size or N
+        rd = self.cfg.reduce_dtype
+        h = self.cfg.hidden
+        scale = h ** 0.5
+
+        M = torch.full((B,), self.NEG, device=xb.device, dtype=rd)
+        D = torch.zeros((B,), device=xb.device, dtype=rd)
+        V = torch.zeros((B, h), device=xb.device, dtype=rd)
+
+        for s0 in range(0, N, C):
+            y = self.mlp(xb[:, s0:s0 + C].to(self._wdtype))          # (B, n, h)
+            s = (y.to(rd) @ self.query.to(rd)) / scale               # (B, n)
+            m_chunk = s.amax(dim=1)                                  # (B,)
+            m_new = torch.maximum(M, m_chunk)
+            rescale = torch.exp(M - m_new)                           # (B,)
+            w = torch.exp(s - m_new.unsqueeze(1))                    # (B, n)
+            D = D * rescale + w.sum(dim=1)
+            # (B,1,n) @ (B,n,h) -> (B,1,h): no (B, n, h) temporary
+            V = V * rescale.unsqueeze(1) + torch.bmm(w.unsqueeze(1), y.to(rd)).squeeze(1)
+            M = m_new
+            del y, s, w
+        return V / D.clamp_min(1e-30).unsqueeze(1)
+
+    def logits(self, x: torch.Tensor,
+               attention_mask: torch.Tensor | None = None) -> torch.Tensor:
+        p = self.pooled(x)
+        z = self.out(p.to(self.out.weight.dtype)).squeeze(-1)
+        out = self._clamp(z)
+        return out.squeeze(0) if x.dim() == 2 else out
+
+
+class SDPASelfAttnProbe(_ProbeBase):
+    """Full self-attention pooling via torch's fused SDPA, then mean-pool.
+
+    The paper's SelfAttnProbe forms an explicit (B, N, N) score matrix, so its Theta(N^2)
+    is again an implementation property. F.scaled_dot_product_attention dispatches to a
+    flash or memory-efficient kernel that never materialises N^2, which is the point
+    FlashAttention makes. Included so the 10.1 GiB and the OOM in the paper are qualified
+    rather than left standing.
+    """
+
+    kind = "self_attn_sdpa"
+
+    def __init__(self, cfg: ProbeConfig):
+        super().__init__()
+        self.cfg = cfg
+        self.proj = nn.Linear(cfg.d_model, cfg.hidden)
+        self.qkv = nn.Linear(cfg.hidden, 3 * cfg.hidden, bias=False)
+        self.out = nn.Linear(cfg.hidden, 1)
+
+    def logits(self, x: torch.Tensor,
+               attention_mask: torch.Tensor | None = None) -> torch.Tensor:
+        import torch.nn.functional as F
+        xb, squeezed = _as_btd(x)
+        rd, cd = self.cfg.reduce_dtype, self._wdtype
+        h = self.proj(xb.to(cd))
+        q, k, v = self.qkv(h).chunk(3, dim=-1)
+        ctx = F.scaled_dot_product_attention(q.unsqueeze(1), k.unsqueeze(1),
+                                             v.unsqueeze(1)).squeeze(1)
+        pooled = ctx.to(rd).mean(dim=1)
+        z = self.out(pooled.to(self.out.weight.dtype)).squeeze(-1)
+        out = self._clamp(z)
+        return out.squeeze(0) if squeezed else out
+
+
 def build_ext_probe(kind: str, cfg: ProbeConfig, r: int = 8):
     if kind == "topr":
         return TopRProbe(cfg, r=r)
     if kind == "mean_max":
         return MeanMaxProbe(cfg)
+    if kind == "softmax_stream":
+        return StreamingSoftmaxAttnProbe(cfg)
+    if kind == "self_attn_sdpa":
+        return SDPASelfAttnProbe(cfg)
     raise ValueError(f"unknown extended probe: {kind}")
 
 
