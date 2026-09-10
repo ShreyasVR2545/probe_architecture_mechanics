@@ -4,9 +4,9 @@
 
 ![Python](https://img.shields.io/badge/python-3.14-blue)
 ![PyTorch](https://img.shields.io/badge/pytorch-2.11%2Bcu128-ee4c2c)
-![claims](https://img.shields.io/badge/claim%20checks-121%2F121%20passing-brightgreen)
+![claims](https://img.shields.io/badge/claim%20checks-143%2F143%20passing-brightgreen)
 ![context](https://img.shields.io/badge/context-128%20→%20131%2C072-informational)
-![pages](https://img.shields.io/badge/paper-23%20pages%2C%200%20warnings-blue)
+![pages](https://img.shields.io/badge/paper-25%20pages%2C%200%20warnings-blue)
 ![license](https://img.shields.io/badge/license-MIT-lightgrey)
 
 Activation probes are deployed safety infrastructure, shipped inside frontier assistants
@@ -79,6 +79,75 @@ Every cell is read from [`benchmark_results.json`](benchmark_results.json) and v
 | memory & latency scaling | annealing | distributed attack |
 |---|---|---|
 | ![mem](figures/fig2_memory_scaling.png) | ![anneal](figures/fig3_annealing_recall.png) | ![dist](figures/fig4_distributed_attack.png) |
+
+---
+
+## Low-FPR Operational Metrics & Baseline Comparisons
+
+Every real-residual number is now reported with a **95% confidence interval from 1,000
+class-stratified bootstrap resamples**, and against two standard baseline families rather
+than only against other aggregators. Two things follow, and the second is not the result
+we expected.
+
+**A linear probe on the mean-pooled residual beats us on AUROC.** On both models. We
+report it rather than bury it.
+
+**The ordering inverts at the operating point that matters.** A guardrail runs at a fixed
+low false-positive budget; AUROC averages over thresholds nobody deploys at. At 1% FPR,
+Top-$r$ leads on both models, and on Qwen by a wide margin.
+
+| aggregator | AUROC (Mistral) | TPR@1%FPR (Mistral) | AUROC (Qwen) | TPR@1%FPR (Qwen) | activation memory |
+|---|---|---|---|---|---|
+| Mean + logistic reg. | **0.802** | 0.413 | **0.871** | 0.382 | $O(N)$ |
+| wLDA (Fisher) | 0.765 | 0.375 | 0.829 | 0.323 | $O(N)$ |
+| LatentBiopsy (angular) | 0.572 | 0.063 | 0.616 | 0.069 | $O(N)$ |
+| MultiMax ($H{=}8$) | 0.694 | 0.392 | 0.816 | 0.451 | $\Theta(\min(C,N))$ |
+| **Top-$r$ ($r{=}8$)** | 0.738 | **0.451** | 0.853 | **0.604** | $\Theta(\min(C,N))$ |
+
+Averaged over layers and over $N \in \{512, 1024, 2048, 4096\}$. The two max-family rows
+are the only ones whose memory does not grow with the context: the baselines all need the
+whole sequence resident to form their pooled representation.
+
+**Caveats, because they are large.** With 24 positives and 24 negatives per cell the
+intervals span roughly ±0.12 AUROC and ±0.20 TPR, and most pairwise gaps in the table are
+not separable. The two separations that hold across both models, all four lengths and
+both metrics are: the angular baseline is clearly worst, and Top-$r$ is at or near the top
+on TPR@1%FPR.
+
+**A prediction of ours that did not survive contact with the data.** Prop. 2.3 says
+mean-pooled scores dilute as $\Theta(1/\sqrt{N})$, so the linear and angular baselines
+should lose ground as $N$ grows. They do not: on Mistral the linear probe *gains* 0.150
+AUROC from $N{=}512$ to $4096$ while MultiMax loses 0.042. Measuring why, the class-mean
+separation does fall (0.060 → 0.037) exactly as predicted, but the spread of the benign
+mean falls *faster* (0.240 → 0.147), so the ratio a linear classifier sees is flat to
+rising (0.251 → 0.309). Our filler is a short passage repeated to length, which makes the
+benign mean nearly noiseless. That is a limitation of the evaluation, not a refutation of
+the proposition, and the paper says so.
+
+![baseline ROC](docs/assets/fig_baseline_roc.png)
+
+![length scaling with 95% CI ribbons](docs/assets/fig_length_scaling.png)
+
+### Reproducing the bootstrap evaluation
+
+```bash
+# 1. fill the residual caches at the two lengths the earlier experiments did not cover
+python experiments/extract_extra_lengths.py --models mistral,qwen
+
+# 2. bootstrap + baselines: 1,000 resamples, AUROC and TPR@1%FPR with 95% CIs
+python experiments/exp9_bootstrap_baselines.py --n-bootstraps 1000
+python experiments/exp9_bootstrap_baselines.py --n-bootstraps 1000 --models mistral-7b
+python experiments/exp9_bootstrap_baselines.py --quick --n-bootstraps 100   # smoke test
+
+# 3. figures: SVG + 320 dpi PNG + PDF into docs/assets/
+python tools/make_baseline_figures.py
+```
+
+Outputs land in `artifacts/exp9_bootstrap_baselines.json` (per-cell metrics, CIs and the
+sampled ROC curves) and `artifacts/exp9_meanpool_snr.json` (the dilution diagnostic).
+Both are covered by `tools/check_claims.py`, which asserts the *directions* above, so a
+rerun that flipped "the linear baseline wins on AUROC" would fail the build rather than
+silently contradict the text.
 
 ---
 
@@ -194,7 +263,7 @@ python benchmark_suite.py            # --quick for a smaller ladder
 python suite_d_chunk_ablation.py     # answers "is O(1) just chunking?" -> Theta(min(C,N))
 
 # verification and artifacts
-python tools/check_claims.py         # 121/121 prose-vs-artifact checks (incl. paper.tex)
+python tools/check_claims.py         # 143/143 prose-vs-artifact checks (incl. paper.tex)
 python tools/check_tex.py            # structure, numbering, dangling refs + citations
 python tools/audit_bib.py            # every arXiv id re-resolved against the arXiv API
 # figures: all three scripts, then the paper. Every figure is redrawn from
@@ -202,6 +271,7 @@ python tools/audit_bib.py            # every arXiv id re-resolved against the ar
 python tools/make_figures.py         # fig1..fig4 from benchmark_results.json
 python tools/make_diagrams.py        # architecture + cascade schematics
 python tools/make_result_figures.py  # the six empirical figures
+python tools/make_baseline_figures.py # baseline ROC + CI ribbons -> docs/assets/
 
 # reviewer-response experiments (run in this order; each writes artifacts/exp*.json)
 python experiments/exp1_real_residuals.py --max-n 4096   # real Mistral-7B residuals
@@ -247,7 +317,7 @@ BENCHMARK_NOTES.md           measured tables, bugs found, limitations
 benchmark_results.json       Suites A-D, verdicts          <- single source of truth
 logs/calibration_report.json Platt metrics + delta sweep
 tools/make_figures.py        all figures, driven from the JSON artifact
-tools/check_claims.py        verifies prose against artifacts (121 checks)
+tools/check_claims.py        verifies prose against artifacts (143 checks)
 tools/check_tex.py           LaTeX structure, numbering, refs + citation audit
 tools/audit_bib.py           re-resolves every arXiv id against the arXiv API
 tools/make_diagrams.py       architecture + cascade schematics (measured box layout)

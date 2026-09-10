@@ -63,3 +63,4 @@ artifacts/_*.log
 artifacts/qwen_acts/
 artifacts/cascade500/
 artifacts/_offload_qwen/
+artifacts/_offload/

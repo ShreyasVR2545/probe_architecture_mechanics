@@ -402,10 +402,16 @@ def main() -> int:
                        v["multimax_beats_softmax"] is False,
                        f"multimax {mm:.4f}, softmax {sm:.4f}"))
         for kind, want in (("multimax", "0.817"), ("topr", "0.859"),
-                           ("softmax_attn", "0.833"), ("mean_pool", "0.748")):
+                           ("softmax_attn", "0.833")):
             checks.append((f"E8 mean AUROC {kind} = {want}",
                            f"{v['mean_auroc'][kind]:.3f}" == want and has(want),
                            f"artifact {v['mean_auroc'][kind]:.4f}"))
+        # mean_pool is no longer tabulated: the Qwen table now compares against the
+        # baseline families instead. The measurement still has to be right, so the value
+        # is asserted, but not its presence in prose it no longer appears in.
+        checks.append(("E8 mean AUROC mean_pool = 0.748 (artifact only)",
+                       f"{v['mean_auroc']['mean_pool']:.3f}" == "0.748",
+                       f"artifact {v['mean_auroc']['mean_pool']:.4f}"))
         det8 = e8["detection"]
 
         def m8(N, kind):
@@ -428,6 +434,66 @@ def main() -> int:
         checks.append(("E8 no final-layer collapse on Qwen (0.773)",
                        f"{sum(mm100) / len(mm100):.3f}" == "0.773" and has("0.773"),
                        f"artifact {sum(mm100) / len(mm100):.4f}"))
+
+    e9 = art("exp9_bootstrap_baselines.json")
+    if e9:
+        v = e9["verdicts"]
+        checks.append(("E9 1000 bootstrap resamples", v["n_bootstraps"] == 1000,
+                       f"n_boot={v['n_bootstraps']}"))
+        checks.append(("E9 lengths 512/1024/2048/4096",
+                       v["lengths"] == [512, 1024, 2048, 4096], str(v["lengths"])))
+        checks.append(("E9 no missing cells", not v["missing_cells"],
+                       f"{len(v['missing_cells'])} missing"))
+        au, tp = v["mean_auroc"], v["mean_tpr_at_1fpr"]
+        # The paper says plainly that a LINEAR baseline wins on AUROC and that Top-r
+        # wins on the operational metric. Both directions are asserted, so a rerun that
+        # flipped either would fail the build rather than quietly contradict the prose.
+        for m in ("mistral-7b", "qwen2.5-7b"):
+            checks.append((f"E9 {m}: mean_logreg best on AUROC (paper says so)",
+                           au[m]["mean_logreg"] == max(au[m].values()),
+                           f"{ {k: round(x,3) for k,x in au[m].items()} }"))
+            checks.append((f"E9 {m}: topr best on TPR@1%FPR (paper says so)",
+                           tp[m]["topr"] == max(tp[m].values()),
+                           f"{ {k: round(x,3) for k,x in tp[m].items()} }"))
+            checks.append((f"E9 {m}: latentbiopsy worst on TPR@1%FPR",
+                           tp[m]["latentbiopsy"] == min(tp[m].values()), ""))
+        for m, kind, want in (("mistral-7b", "mean_logreg", "0.802"),
+                              ("mistral-7b", "topr", "0.738"),
+                              ("qwen2.5-7b", "mean_logreg", "0.871"),
+                              ("qwen2.5-7b", "topr", "0.853")):
+            checks.append((f"E9 mean AUROC {m}/{kind} = {want}",
+                           f"{au[m][kind]:.3f}" == want and has(want),
+                           f"artifact {au[m][kind]:.4f}"))
+        for m, kind, want in (("mistral-7b", "topr", "0.451"),
+                              ("mistral-7b", "mean_logreg", "0.413"),
+                              ("qwen2.5-7b", "topr", "0.604"),
+                              ("qwen2.5-7b", "mean_logreg", "0.382")):
+            checks.append((f"E9 mean TPR@1% {m}/{kind} = {want}",
+                           f"{tp[m][kind]:.3f}" == want and has(want),
+                           f"artifact {tp[m][kind]:.4f}"))
+        # The dilution prediction FAILS here; the paper says so, so assert the failure.
+        ch = v["auroc_change_short_to_long"]
+        checks.append(("E9 linear baseline does NOT dilute on mistral (paper says so)",
+                       ch["mistral-7b"]["mean_logreg"] > 0,
+                       f"{ch['mistral-7b']['mean_logreg']:+.4f}"))
+        checks.append(("E9 peaked aggregators fall most on qwen (paper says so)",
+                       ch["qwen2.5-7b"]["multimax"] < ch["qwen2.5-7b"]["wlda"], ""))
+        checks.append(("E9 mistral logreg gain +0.150 quoted",
+                       f"{ch['mistral-7b']['mean_logreg']:.3f}" == "0.150"
+                       and has("0.150"), f"{ch['mistral-7b']['mean_logreg']:.4f}"))
+
+    snr = art("exp9_meanpool_snr.json")
+    if snr:
+        # The mean-pool SNR ratio must be flat-to-rising, which is the paper's
+        # explanation for why the dilution prediction does not bite in this protocol.
+        ks = sorted(snr, key=int)
+        ratios = [snr[k]["signal_||dmu||"] / snr[k]["benign_mean_spread"] for k in ks]
+        checks.append(("E9 mean-pool SNR ratio does not fall with N",
+                       ratios[-1] >= ratios[0],
+                       f"{[round(r,3) for r in ratios]}"))
+        checks.append(("E9 SNR ratio 0.251 -> 0.309 quoted",
+                       f"{ratios[0]:.3f}" == "0.251" and f"{ratios[-1]:.3f}" == "0.309"
+                       and has("0.251") and has("0.309"), ""))
 
     width = max(len(c[0]) for c in checks)
     npass = 0

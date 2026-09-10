@@ -13,6 +13,7 @@ echo "== figures =="
 python tools/make_figures.py        || { echo "FAILED: make_figures"; exit 1; }
 python tools/make_diagrams.py       || { echo "FAILED: make_diagrams"; exit 1; }
 python tools/make_result_figures.py || { echo "FAILED: make_result_figures"; exit 1; }
+python tools/make_baseline_figures.py || { echo "FAILED: make_baseline_figures"; exit 1; }
 
 echo "== paper =="
 rm -f paper.aux paper.bbl paper.blg paper.log paper.out

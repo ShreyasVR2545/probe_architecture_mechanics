@@ -708,28 +708,45 @@ detection obviously does. We do not report detection at lengths where we cannot 
 it.
 
 \begin{table}[t]
-\centering\small
-\begin{tabular}{rrccc}
+\centering\footnotesize
+\setlength{\tabcolsep}{3.5pt}
+\begin{tabular}{lcccc}
 \toprule
-$N$ & layer & MultiMax (ours) & Softmax attention & Mean pooling\\
+& \multicolumn{4}{c}{context length $N$}\\
+\cmidrule(lr){2-5}
+aggregator & $512$ & $1024$ & $2048$ & $4096$\\
 \midrule
-$256$  & 16 & $\mathbf{0.917}$ & $0.823$ & $0.828$\\
-$256$  & 24 & $0.844$ & $\mathbf{0.856}$ & $0.774$\\
-$256$  & 31 & $0.544$ & $\mathbf{0.812}$ & $0.722$\\
-$1024$ & 16 & $\mathbf{0.906}$ & $0.457$ & $0.500$\\
-$1024$ & 24 & $\mathbf{0.783}$ & $0.642$ & $0.655$\\
-$1024$ & 31 & $0.476$ & $0.703$ & $\mathbf{0.759}$\\
-$4096$ & 16 & $0.757$ & $0.701$ & $\mathbf{0.807}$\\
-$4096$ & 24 & $\mathbf{0.764}$ & $0.639$ & $0.646$\\
-$4096$ & 31 & $\mathbf{0.586}$ & $0.576$ & $0.575$\\
+\multicolumn{5}{l}{\emph{AUROC} $[95\%\ \mathrm{CI}]$}\\
+Mean $+$ logistic reg. & $0.690${\tiny\,[.54,.82]} & $0.808${\tiny\,[.67,.91]}
+  & $\mathbf{0.868}${\tiny\,[.75,.95]} & $\mathbf{0.840}${\tiny\,[.73,.93]}\\
+wLDA (Fisher)          & $0.691${\tiny\,[.54,.82]} & $\mathbf{0.808}${\tiny\,[.68,.91]}
+  & $0.830${\tiny\,[.70,.92]} & $0.731${\tiny\,[.59,.86]}\\
+LatentBiopsy (angular) & $0.569${\tiny\,[.40,.73]} & $0.593${\tiny\,[.43,.75]}
+  & $0.656${\tiny\,[.50,.80]} & $0.469${\tiny\,[.31,.64]}\\
+MultiMax ($H{=}8$)     & $0.703${\tiny\,[.59,.79]} & $0.709${\tiny\,[.62,.78]}
+  & $0.703${\tiny\,[.55,.83]} & $0.661${\tiny\,[.53,.79]}\\
+Top-$r$ ($r{=}8$)      & $\mathbf{0.743}${\tiny\,[.66,.81]} & $0.741${\tiny\,[.66,.80]}
+  & $0.752${\tiny\,[.65,.83]} & $0.715${\tiny\,[.58,.85]}\\
 \midrule
-\multicolumn{2}{l}{mean over all cells} & $\mathbf{0.731}$ & $0.690$ & $0.696$\\
+\multicolumn{5}{l}{\emph{TPR at $1\%$ FPR} $[95\%\ \mathrm{CI}]$}\\
+Mean $+$ logistic reg. & $0.250${\tiny\,[.10,.49]} & $0.347${\tiny\,[.17,.67]}
+  & $\mathbf{0.597}${\tiny\,[.42,.83]} & $\mathbf{0.458}${\tiny\,[.29,.76]}\\
+wLDA (Fisher)          & $0.208${\tiny\,[.07,.51]} & $0.444${\tiny\,[.25,.65]}
+  & $0.458${\tiny\,[.29,.72]} & $0.389${\tiny\,[.19,.65]}\\
+LatentBiopsy (angular) & $0.083${\tiny\,[.00,.33]} & $0.097${\tiny\,[.01,.33]}
+  & $0.056${\tiny\,[.00,.42]} & $0.014${\tiny\,[.00,.08]}\\
+MultiMax ($H{=}8$)     & $\mathbf{0.472}${\tiny\,[.33,.58]} & $0.333${\tiny\,[.21,.56]}
+  & $0.347${\tiny\,[.24,.61]} & $0.417${\tiny\,[.28,.61]}\\
+Top-$r$ ($r{=}8$)      & $0.458${\tiny\,[.33,.60]} & $\mathbf{0.458}${\tiny\,[.33,.58]}
+  & $0.486${\tiny\,[.33,.65]} & $0.403${\tiny\,[.28,.53]}\\
 \bottomrule
 \end{tabular}
-\caption{Detection AUROC on real Mistral-7B-v0.1 residual streams under a
-\emph{needle-disjoint} split: the six harmful sentences used at test time never appear in
-training. 24 positives and 24 negatives per cell. MultiMax wins 5 of 9 cells and the mean,
-by a narrow margin.}
+\setlength{\tabcolsep}{6pt}
+\caption{Mistral-7B-v0.1 real residual streams, needle-disjoint split, averaged over
+layers 16, 24 and 31. Brackets are $95\%$ percentile intervals from $1{,}000$
+class-stratified bootstrap resamples of the held-out set (24 positives, 24 negatives per
+cell). Bold marks the best entry in each column. The intervals are wide enough that most
+column leads are not separable; see the text.}
 \label{tab:realllm}
 \end{table}
 
@@ -744,15 +761,88 @@ number we report is from the needle-disjoint split; the index-split figures are 
 the artifact for comparison. We flag this because the size of the effect, a tenth of an
 AUROC point, is larger than most of the differences such tables are used to argue about.
 
-\paragraph{Result.} On the honest split MultiMax still leads, with mean AUROC $0.731$
-against $0.690$ for softmax pooling and $0.696$ for mean pooling, and wins 5 of the 9
-cells. That is a real but modest lead, and considerably narrower than the synthetic
-benchmarks suggest. The systems claim survives far more cleanly than the detection claim:
-at the model's true width the MultiMax overhead is flat at $8.0$\,MiB across a $32\times$
-range of $N$, while softmax pooling grows from $28.0$\,MiB to $641.0$\,MiB, a ratio of
-$80\times$ at $N=131{,}072$. The asymmetry is the paper's thesis in miniature. The
-architectural claim transfers to real activations essentially unchanged; the detection
-advantage transfers, but shrinks.
+\paragraph{Result: the baselines are strong, and AUROC and TPR disagree.}
+Table~\ref{tab:realllm} adds two things the earlier version lacked: uncertainty, and
+comparators outside our own family. Both change the reading.
+
+A logistic regression on the mean-pooled residual is the \emph{best} method by AUROC on
+this model, at $0.802$ averaged over lengths against $0.738$ for Top-$r$ and $0.694$ for
+MultiMax. We report that plainly. It is not the conclusion we expected and it is not
+softened anywhere in what follows.
+
+The ordering inverts at the operating point a guardrail actually runs at. At $1\%$ FPR,
+Top-$r$ leads with $0.451$ against $0.413$ for the linear probe and $0.375$ for wLDA, and
+on Qwen the gap is much larger ($0.604$ against $0.382$; Table~\ref{tab:qwen}). AUROC
+integrates over every threshold including ones no deployment would use; a monitor with an
+escalation budget cares only about the left edge of the ROC curve, and that is where the
+max-family aggregators are strongest. Fig.~\ref{fig:baselineroc} shows the curves, and the
+crossing near the $1\%$ line is visible directly.
+
+The angular baseline is weak throughout and close to useless at low FPR, at $0.063$ on
+Mistral and $0.069$ on Qwen. A detector built from distance to a normative subspace has no
+mechanism for concentrating on one span, and at a strict threshold that costs it almost
+everything.
+
+\paragraph{What the intervals say.} They say most of these gaps are not resolvable at this
+sample size. With 24 positives and 24 negatives per cell the $95\%$ intervals span roughly
+$\pm0.12$ AUROC and $\pm0.20$ TPR, and nearly every pairwise comparison in
+Table~\ref{tab:realllm} has overlapping intervals. The two conclusions we are willing to
+draw are the ones where the separation is consistent across both models, all four lengths
+and both metrics: the angular baseline is clearly worst, and Top-$r$ is consistently at or
+near the top on TPR at $1\%$ FPR. Everything else in these tables should be read as a tie.
+
+\paragraph{The systems claim is unaffected and remains the stronger one.} At the model's
+true width the MultiMax overhead is flat at $8.0$\,MiB across a $32\times$ range of $N$
+while softmax pooling grows from $28.0$\,MiB to $641.0$\,MiB, a ratio of $80\times$ at
+$N=131{,}072$. That is a deterministic measurement with no sampling error attached, and it
+is what the paper rests on. The detection advantage is narrow, metric-dependent and, on
+AUROC, absent.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\textwidth]{docs/assets/fig_baseline_roc.pdf}
+\caption{ROC at $N{=}4096$ against the two baseline families, at the depth where the
+aggregators perform best on each model. The dotted vertical line is the $1\%$ FPR
+operating point. Areas in the legend are AUROC.}
+\label{fig:baselineroc}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.88\textwidth]{docs/assets/fig_length_scaling.pdf}
+\caption{Both metrics against context length for both model families, averaged over
+depth, with $95\%$ bootstrap intervals shaded. The ribbons overlap almost everywhere,
+which is the honest summary of a $24+24$ evaluation; the one consistent separation is
+the angular baseline at the bottom of the lower row.}
+\label{fig:lengthscaling}
+\end{figure}
+
+\paragraph{A dilution prediction that does not hold in this protocol.} Prop.~\ref{prop:mean}
+says a mean-pooled score dilutes as $\Theta(1/\sqrt N)$, so the natural expectation is
+that the linear and angular baselines, which both reduce the sequence by averaging, should
+lose ground to the max family as $N$ grows. They do not. From $N{=}512$ to $N{=}4096$ on
+Mistral the linear probe \emph{gains} $0.150$ AUROC while MultiMax loses $0.042$ and
+Top-$r$ loses $0.028$; on Qwen everything falls and the two peaked aggregators fall
+\emph{most} ($-0.138$ and $-0.129$ against $-0.103$ and $-0.029$ for the baselines). The
+prediction is not confirmed, and we did not go looking for a reading that would rescue it.
+
+Measuring why is more useful than explaining it away. Prop.~\ref{prop:mean} assumes the
+benign background is i.i.d.\ noise, so that the mean of $N$ tokens concentrates at rate
+$1/\sqrt N$ around a fixed benign value while the needle's contribution falls as $k/N$.
+Our filler is not i.i.d.\ noise: it is a short passage repeated to length. Measuring both
+quantities directly at layer 16, the separation between class means falls from $0.060$ to
+$0.037$ as $N$ goes from $512$ to $4096$, exactly as the dilution argument requires, but
+the spread of the benign mean falls faster, from $0.240$ to $0.147$. Their ratio, which is
+what a linear classifier on the mean actually sees, is flat to slightly rising: $0.251$,
+$0.222$, $0.243$, $0.309$. Repetition makes the benign mean a nearly noiseless quantity,
+and a nearly noiseless quantity tolerates a shrinking signal.
+
+This is a limitation of our evaluation, not a refutation of the proposition. Real long
+contexts are heterogeneous rather than a repeated paragraph, the benign mean would not
+concentrate this way, and the classical argument would then apply. But the honest
+statement of what we have measured is that on this data the length-induced advantage of
+the max family over mean-based baselines does not appear, and any claim that it would
+appear on more realistic filler is a conjecture we have not tested.
 
 \paragraph{Where it fails, and what that tells us.} MultiMax degrades sharply with depth.
 Averaged over lengths it scores $0.860$ at layer 16, $0.797$ at layer 24 and $0.535$ at
@@ -1093,23 +1183,45 @@ account, as does \texttt{google/gemma-2-9b}. Layers are selected by \emph{depth 
 layer 16 across models of different depth would confound depth with family.
 
 \begin{table}[!ht]
-\centering\small
+\centering\footnotesize
+\setlength{\tabcolsep}{3.5pt}
 \begin{tabular}{lcccc}
 \toprule
-& \multicolumn{3}{c}{mean AUROC at context length $N$} & \\
-\cmidrule(lr){2-4}
-probe & $256$ & $1024$ & $4096$ & mean\\
+& \multicolumn{4}{c}{context length $N$}\\
+\cmidrule(lr){2-5}
+aggregator & $512$ & $1024$ & $2048$ & $4096$\\
 \midrule
-MultiMax (ours)   & $0.835$ & $0.843$ & $0.774$ & $0.817$\\
-Top-$r$ ($r{=}8$) & $0.904$ & $0.860$ & $\mathbf{0.814}$ & $\mathbf{0.859}$\\
-Softmax attention & $\mathbf{0.947}$ & $\mathbf{0.892}$ & $0.661$ & $0.833$\\
-Mean pooling      & $0.901$ & $0.725$ & $0.619$ & $0.748$\\
+\multicolumn{5}{l}{\emph{AUROC} $[95\%\ \mathrm{CI}]$}\\
+Mean $+$ logistic reg. & $0.883${\tiny\,[.78,.96]} & $\mathbf{0.872}${\tiny\,[.77,.95]}
+  & $\mathbf{0.948}${\tiny\,[.88,.99]} & $0.780${\tiny\,[.65,.89]}\\
+wLDA (Fisher)          & $0.803${\tiny\,[.67,.91]} & $0.837${\tiny\,[.72,.94]}
+  & $0.900${\tiny\,[.80,.97]} & $0.774${\tiny\,[.64,.89]}\\
+LatentBiopsy (angular) & $0.612${\tiny\,[.44,.77]} & $0.613${\tiny\,[.46,.77]}
+  & $0.629${\tiny\,[.46,.78]} & $0.609${\tiny\,[.45,.76]}\\
+MultiMax ($H{=}8$)     & $\mathbf{0.920}${\tiny\,[.83,.99]} & $0.742${\tiny\,[.66,.82]}
+  & $0.818${\tiny\,[.68,.93]} & $0.782${\tiny\,[.66,.89]}\\
+Top-$r$ ($r{=}8$)      & $0.915${\tiny\,[.83,.98]} & $0.861${\tiny\,[.75,.96]}
+  & $0.849${\tiny\,[.73,.95]} & $\mathbf{0.786}${\tiny\,[.65,.90]}\\
+\midrule
+\multicolumn{5}{l}{\emph{TPR at $1\%$ FPR} $[95\%\ \mathrm{CI}]$}\\
+Mean $+$ logistic reg. & $0.264${\tiny\,[.11,.78]} & $0.389${\tiny\,[.24,.79]}
+  & $\mathbf{0.625}${\tiny\,[.39,.92]} & $0.250${\tiny\,[.12,.58]}\\
+wLDA (Fisher)          & $0.167${\tiny\,[.04,.61]} & $0.361${\tiny\,[.21,.82]}
+  & $0.375${\tiny\,[.19,.74]} & $0.389${\tiny\,[.22,.62]}\\
+LatentBiopsy (angular) & $0.042${\tiny\,[.00,.32]} & $0.056${\tiny\,[.00,.33]}
+  & $0.125${\tiny\,[.01,.46]} & $0.056${\tiny\,[.00,.32]}\\
+MultiMax ($H{=}8$)     & $0.597${\tiny\,[.50,.90]} & $0.417${\tiny\,[.29,.61]}
+  & $0.347${\tiny\,[.18,.75]} & $\mathbf{0.444}${\tiny\,[.24,.72]}\\
+Top-$r$ ($r{=}8$)      & $\mathbf{0.694}${\tiny\,[.47,.92]} & $\mathbf{0.708}${\tiny\,[.54,.90]}
+  & $0.611${\tiny\,[.24,.83]} & $0.403${\tiny\,[.28,.56]}\\
 \bottomrule
 \end{tabular}
-\caption{Qwen2.5-7B, averaged over the three depths, needle-disjoint split. Softmax
-pooling is best at short context and worst at long; the two peaked reductions are close to
-flat. The averaged column hides the crossover, which is the point of reporting the
-lengths separately.}
+\setlength{\tabcolsep}{6pt}
+\caption{Qwen2.5-7B, needle-disjoint split, averaged over depths $50\%$, $75\%$ and
+$100\%$. Brackets are $95\%$ bootstrap intervals as in Table~\ref{tab:realllm}.
+Top-$r$ leads the operational metric at three of four lengths and the mean over lengths
+($0.604$ against $0.382$ for the strongest baseline), while the same baseline leads on
+AUROC.}
 \label{tab:qwen}
 \end{table}
 
@@ -1125,6 +1237,13 @@ dilution mechanism the paper is about (Prop.~\ref{prop:softmax}), now reproduced
 second family: query-based pooling has the better representation at short context and
 loses it as the context grows, while a maximum keeps what it has. Our claim is a
 long-context claim, and it survives; a claim of uniform superiority would not have.
+
+\paragraph{The baselines follow the same pattern here.} Against the comparators of
+Table~\ref{tab:qwen} the picture repeats: the linear probe on the mean-pooled residual
+takes AUROC ($0.871$ averaged over lengths, against $0.853$ for Top-$r$), and Top-$r$
+takes the operational metric by a wide margin ($0.604$ TPR at $1\%$ FPR against $0.382$).
+That the same inversion appears on a second model family is the reason we treat it as a
+property of the metrics rather than an accident of one model.
 
 \paragraph{Top-$r$ generalises better than the plain maximum.} On Qwen the best aggregator
 at every length is Top-$r$ or softmax, never the plain maximum, and Top-$r$ takes the
